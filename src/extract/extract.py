@@ -1,9 +1,9 @@
 import cdsapi
+from azure.storage.blob import BlobServiceClient
 
-# TODO: take api keys as parameter here?
 # TODO: return something?
 # TODO: import azure.storage.blob, take path to that as arg
-def download()
+def download(api_url, api_key, storage_conn_str)
 
     # This part from query builder ################
     dataset = "cams-europe-air-quality-forecasts"
@@ -20,5 +20,11 @@ def download()
     #################
 
     client = cdsapi.Client()
-    client.retrieve(dataset, request).download()
+    filename = 'result.grib'
+    client.retrieve(dataset, request, filename).download()
 
+    blob_service = BlobServiceClient.from_connection_string(storage_conn_str)
+    container_client = blob_service.get_container_client('bronze')
+
+    with open(file=filename, mode="rb") as data:
+        blob_client = container_client.upload_blob(name="sample-blob.txt", data=data, overwrite=True)

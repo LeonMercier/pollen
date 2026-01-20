@@ -2,6 +2,7 @@ import azure.functions as func
 import datetime
 import json
 import logging
+import os
 from pathlib import Path
 
 # add the repo root to our path
@@ -21,5 +22,7 @@ def extract(myTimer: func.TimerRequest) -> None:
     
     if myTimer.past_due:
         logging.info('The timer is past due!')
+
+    download(api_url=os.environ['CDSAPI_URL'], api_key=os.environ['CDSAPI_KEY'])
 
     logging.info('Python timer trigger function executed.')
