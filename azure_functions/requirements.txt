@@ -4,3 +4,4 @@
 
 azure-functions
 cdsapi>=0.7.7
+azure-storage-blob
