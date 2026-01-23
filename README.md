@@ -24,6 +24,7 @@ export ARM_TENANT_ID="<TENANT_VALUE>"
 
 source .env
 
+azurite --skipApiVersionCheck
 tf init
 
 ### Environment variables needed

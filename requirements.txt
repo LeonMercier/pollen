@@ -1,0 +1,2 @@
+# This is for the whole project, azure functions has its own
+pygrib

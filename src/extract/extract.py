@@ -11,7 +11,7 @@ def download(api_url, api_key, storage_conn_str):
     "variable": ["birch_pollen"],
     "model": ["ensemble"],
     "level": ["0"],
-    "date": ["2025-03-20/2025-03-20"],
+    "date": ["2025-04-20/2025-04-20"],
     "type": ["forecast"],
     "time": ["00:00"],
     "leadtime_hour": ["0"],
