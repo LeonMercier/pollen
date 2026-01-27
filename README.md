@@ -3,22 +3,19 @@
 ## Dev environment
 
 ```
+python3.13 -m venv .venv
+source ./venv/bin/activate
 npm install -g azure-functions-core-tools@4
 npm install -g azurite
 sudo dnf install azure-cli
-mkdir azure_functions && cd azure_functions
-func init . --python
-```
-
-go back to the repo root
-
-```
+pip install -r requirements.txt
+pip install -r azure_functions/requirements.txt
 az login
 az account set --subscription "your-subscription-id"
 az ad sp create-for-rbac --role="Contributor" --scopes="/subscriptions/<SUBSCRIPTION_ID>"
 ```
 
-use the output to set your .env like this
+use the output to create your .env like this
 
 - appId => ARM_CLIENT_ID
 - password => ARM_CLIENT_SECRET
@@ -28,6 +25,7 @@ use the output to set your .env like this
 ## Start your session
 
 ```
+source ./venv/bin/activate
 source .env
 azurite --skipApiVersionCheck
 tf init
