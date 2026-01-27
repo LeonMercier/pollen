@@ -3,8 +3,29 @@
 __pycache__/
 .env
 
+# Terraform files
 .terraform/
-terraform.*
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
 .terraform.lock.hcl
+terraform.tfvars
+*.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Crash log files
+crash.log
+crash.*.log
 
 .azurite/
+
+# IDE files
+*.swp
+*.swo
+*~
+
+# Databricks
+.databricks/
