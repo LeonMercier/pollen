@@ -79,3 +79,7 @@ output "data_factory_id" {
   value       = azurerm_data_factory.adf.id
 }
 
+output "data_factory_principal_id" {
+  description = "Data Factory Managed Identity principal ID"
+  value       = azurerm_data_factory.adf.identity[0].principal_id
+}

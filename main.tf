@@ -80,8 +80,8 @@ resource "azurerm_resource_group" "rg" {
   location = var.location
 
   tags = {
-    ManagedBy   = "Terraform"
-    Project     = "Pollen-ETL"
+    ManagedBy = "Terraform"
+    Project   = "Pollen-ETL"
   }
 }
 
@@ -134,19 +134,6 @@ resource "azurerm_key_vault_secret" "sql_password" {
   depends_on = [azurerm_key_vault_access_policy.user]
 }
 
-# Placeholder for Databricks token (you'll update this manually)
-resource "azurerm_key_vault_secret" "databricks_token" {
-  name         = "databricks-token"
-  value        = "PLACEHOLDER-generate-token-in-databricks-ui"
-  key_vault_id = azurerm_key_vault.kv.id
-
-  depends_on = [azurerm_key_vault_access_policy.user]
-
-  lifecycle {
-    ignore_changes = [value] # Don't overwrite manual updates
-  }
-}
-
 # ========================================
 # SECTION 6: Azure SQL Database
 # ========================================
@@ -194,9 +181,18 @@ resource "azurerm_databricks_workspace" "dbw" {
   tags = azurerm_resource_group.rg.tags
 }
 
-# Note: Databricks notebooks and secret scopes will be managed separately
-# You can add notebooks manually via the Databricks UI or deploy them
-# in a future Terraform apply using the databricks provider
+# Grant Data Factory Managed Identity access to Databricks workspace
+# This allows Data Factory to authenticate using Managed Identity instead of PAT token
+resource "azurerm_role_assignment" "adf_databricks" {
+  scope                = azurerm_databricks_workspace.dbw.id
+  role_definition_name = "Contributor"
+  principal_id         = azurerm_data_factory.adf.identity[0].principal_id
+
+  depends_on = [
+    azurerm_databricks_workspace.dbw,
+    azurerm_data_factory.adf
+  ]
+}
 
 # ========================================
 # SECTION 8: Data Factory (Orchestration)
@@ -223,36 +219,24 @@ resource "azurerm_data_factory_linked_service_key_vault" "kv" {
   key_vault_id    = azurerm_key_vault.kv.id
 }
 
-# 8.3: Linked Service - Databricks (with ephemeral job cluster)
+# 8.3: Linked Service - Databricks (with Managed Identity authentication)
 resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
   name            = "ls-databricks"
   data_factory_id = azurerm_data_factory.adf.id
 
   # New cluster configuration (ephemeral - spins up per job, then destroys)
-  # This is the key to cost optimization!
   new_cluster_config {
-    node_type             = "Standard_D3_v2"   # Smallest available in Sweden Central
-    cluster_version       = "13.3.x-scala2.12" # Latest LTS Spark version
+    node_type             = "Standard_D2as_v5" # Smallest available in Sweden Central
+    cluster_version       = "17.3.x-scala2.13" # Latest LTS Spark version
     min_number_of_workers = 1                  # Minimum cluster size
     max_number_of_workers = 1                  # Fixed size for cost control
-
-    # Optional: Add init scripts or Spark configuration
-    # spark_conf = {
-    #   "spark.speculation" = "false"
-    # }
   }
 
-  adb_domain = "https://${azurerm_databricks_workspace.dbw.workspace_url}"
-
-  # Reference Databricks PAT token from Key Vault
-  key_vault_password {
-    linked_service_name = azurerm_data_factory_linked_service_key_vault.kv.name
-    secret_name         = "databricks-token"
-  }
+  adb_domain                 = "https://${azurerm_databricks_workspace.dbw.workspace_url}"
+  msi_work_space_resource_id = azurerm_databricks_workspace.dbw.id
 
   depends_on = [
-    azurerm_key_vault_secret.databricks_token,
-    azurerm_key_vault_access_policy.adf
+    azurerm_role_assignment.adf_databricks # Wait for permissions to be granted
   ]
 }
 
