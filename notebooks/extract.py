@@ -1,4 +1,9 @@
+# TODO: move this to an init script
+%pip install cdsapi
+
 import cdsapi
+import os
+import shutil
 
 def download(api_url, api_key):
     """
@@ -24,13 +29,18 @@ def download(api_url, api_key):
     # Initialize CDSAPI client with explicit credentials
     client = cdsapi.Client(url=api_url, key=api_key)
 
-    filename = 'result.grib'
+    local_filename = 'result.grib'
 
     # when filename is passed as argument, returns a string, NOT a Result 
     # object with a .download() method
-    client.retrieve(dataset, request, filename)
-    
-    return filename  # Return for downstream processing
+    client.retrieve(dataset, request, local_filename)
+
+    # move local file to DBFS for next steps
+    dbfs_path = f"/dbfs/mnt/pollen/bronze/result.grib"
+    os.makedirs("/dbfs/mnt/pollen/bronze", exist_ok=True)
+    shutil.copy(local_filename, dbfs_path)
+
+    return local_filename  # Return for downstream processing
 
 
 # Retrieve secrets from Databricks-managed secret scope
