@@ -1,8 +1,10 @@
-import os
 import cdsapi
 
-# TODO: return something?
 def download(api_url, api_key):
+    """
+    Downloads pollen forecast data from Copernicus CAMS.
+    Returns the filename of the downloaded GRIB file.
+    """
 
     # This part from CAMS query builder ################
     dataset = "cams-europe-air-quality-forecasts"
@@ -19,18 +21,23 @@ def download(api_url, api_key):
     }
     ####################################################
 
-    client = cdsapi.Client()
+    # Initialize CDSAPI client with explicit credentials
+    client = cdsapi.Client(url=api_url, key=api_key)
 
     filename = 'result.grib'
 
     # when filename is passed as argument, returns a string, NOT a Result 
     # object with a .download() method
     client.retrieve(dataset, request, filename)
+    
+    return filename  # Return for downstream processing
 
 
-# TODO: load env vars
-api_url = 
-api_key = 
+# Retrieve secrets from Databricks-managed secret scope
+# Secrets are stored securely in Databricks (encrypted at rest)
+api_url = dbutils.secrets.get(scope="secrets", key="cdsapi-url")
+api_key = dbutils.secrets.get(scope="secrets", key="cdsapi-key")
 
+# Execute download
 download(api_url, api_key)
 

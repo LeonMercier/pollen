@@ -16,3 +16,17 @@ variable "sql_admin_username" {
   default     = "sqladmin"
 }
 
+variable "cdsapi_url" {
+  description = "CDSAPI URL endpoint for Copernicus Atmosphere Data Store"
+  type        = string
+  sensitive   = false
+  default     = "https://ads.atmosphere.copernicus.eu/api"
+}
+
+variable "cdsapi_key" {
+  description = "CDSAPI authentication key (UID:API-key format)"
+  type        = string
+  sensitive   = true
+  # No default - must be provided via terraform.tfvars
+}
+

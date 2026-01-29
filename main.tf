@@ -29,6 +29,7 @@ provider "azurerm" {
       recover_soft_deleted_key_vaults = true
     }
   }
+
   use_cli = true
 }
 
@@ -135,6 +136,24 @@ resource "azurerm_key_vault_secret" "sql_password" {
   depends_on = [azurerm_key_vault_access_policy.user]
 }
 
+# CDSAPI URL secret
+resource "azurerm_key_vault_secret" "cdsapi_url" {
+  name         = "cdsapi-url"
+  value        = var.cdsapi_url
+  key_vault_id = azurerm_key_vault.kv.id
+
+  depends_on = [azurerm_key_vault_access_policy.user]
+}
+
+# CDSAPI Key secret
+resource "azurerm_key_vault_secret" "cdsapi_key" {
+  name         = "cdsapi-key"
+  value        = var.cdsapi_key
+  key_vault_id = azurerm_key_vault.kv.id
+
+  depends_on = [azurerm_key_vault_access_policy.user]
+}
+
 # ========================================
 # SECTION 6: Azure SQL Database
 # ========================================
@@ -193,6 +212,41 @@ resource "azurerm_role_assignment" "adf_databricks" {
     azurerm_databricks_workspace.dbw,
     azurerm_data_factory.adf
   ]
+}
+
+# Create Databricks-managed secret scope
+# Secrets are stored in Databricks (encrypted at rest), not in Azure Key Vault
+# This works with Standard tier Databricks (Premium tier not required)
+resource "databricks_secret_scope" "secrets" {
+  name = "secrets"
+
+  # No keyvault_metadata block = Databricks-managed scope
+
+  # Standard tier requires initial_manage_principal = "users"
+  # This allows all workspace users to manage the scope
+  initial_manage_principal = "users"
+
+  depends_on = [
+    azurerm_role_assignment.adf_databricks
+  ]
+}
+
+# Store CDSAPI URL in Databricks secret scope
+resource "databricks_secret" "cdsapi_url" {
+  scope        = databricks_secret_scope.secrets.name
+  key          = "cdsapi-url"
+  string_value = var.cdsapi_url
+
+  depends_on = [databricks_secret_scope.secrets]
+}
+
+# Store CDSAPI key in Databricks secret scope
+resource "databricks_secret" "cdsapi_key" {
+  scope        = databricks_secret_scope.secrets.name
+  key          = "cdsapi-key"
+  string_value = var.cdsapi_key
+
+  depends_on = [databricks_secret_scope.secrets]
 }
 
 # ========================================
@@ -270,11 +324,9 @@ resource "azurerm_data_factory_pipeline" "etl" {
       dependsOn = []
 
       typeProperties = {
-        # Update this path after creating your notebook in Databricks
-        # Path should be relative to Databricks workspace root
-        # Example: /Workspace/Users/your.email@domain.com/etl_pipeline
-        # Or if using Repos: /Repos/your-repo/notebooks/etl_pipeline
-        notebookPath = "/Workspace/notebooks/etl_pipeline"
+        # Notebook path in Databricks workspace
+        # Upload extract.py to this path in Databricks
+        notebookPath = "/Workspace/notebooks/extract"
 
         # Optional: Pass parameters to your notebook
         baseParameters = {
