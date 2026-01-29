@@ -29,6 +29,7 @@ provider "azurerm" {
       recover_soft_deleted_key_vaults = true
     }
   }
+  use_cli = true
 }
 
 # Databricks provider - uses Azure CLI authentication

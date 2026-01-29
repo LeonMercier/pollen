@@ -4,6 +4,7 @@ import pygrib
 import numpy as np
 from datetime import datetime
 
+# TODO: convert from blob storage to Databricks
 def transform(storage_conn_str):
     # Now configure Blob storage and upload ############
 
