@@ -16,6 +16,22 @@ def transform(input_path):
         print(grb.values)
         # print(grb.keys())
 
+        lats, lons = grb.latlons()
+        values = grb.values
+
+        lats_flat = lats.flatten()
+        lons_flat = lons.flatten()
+        values_flat = values.flatten()
+
+        data = {
+                'variable': grb.shortName,
+                'lat': lats_flat,
+                'lon': lons_flat,
+                'value': values_flat
+        }
+        print(data)
+
+
     # TODO: flatten data
     # TODO: write parquet file into silver storage
     grbs.close()
