@@ -3,7 +3,9 @@
 import os
 import pygrib
 import numpy as np
+import pandas as pd
 from datetime import datetime
+
 
 def transform(input_path):
     # pygrib cannot read directly from DBFS, hence the copy operation
@@ -29,7 +31,8 @@ def transform(input_path):
                 'lon': lons_flat,
                 'value': values_flat
         }
-        print(data)
+        df = pd.DataFrame(data)
+        print(df)
 
 
     # TODO: flatten data

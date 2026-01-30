@@ -313,6 +313,10 @@ resource "azurerm_data_factory_linked_service_key_vault" "kv" {
 }
 
 # 9.3: Linked Service - Databricks (with Managed Identity authentication)
+# This cluster will spin up when the trigger (see below) is activated. 
+# when it is activated = false, is will only spin up with manual activation
+# from Data Factory UI. In the meantime, dev clusters can be spun up from the 
+# Databricks UI. 
 resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
   name            = "ls-databricks"
   data_factory_id = azurerm_data_factory.adf.id
