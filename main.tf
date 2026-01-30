@@ -250,10 +250,48 @@ resource "databricks_secret" "cdsapi_key" {
 }
 
 # ========================================
-# SECTION 8: Data Factory (Orchestration)
+# SECTION 8: Databricks Notebooks
 # ========================================
 
-# 8.1: Data Factory Resource
+# Upload extract notebook
+resource "databricks_notebook" "extract" {
+  source = "${path.module}/notebooks/extract.py"
+  path   = "/Workspace/notebooks/extract"
+
+  # Ensure workspace and permissions are ready
+  depends_on = [
+    azurerm_role_assignment.adf_databricks,
+    databricks_secret_scope.secrets
+  ]
+}
+
+# Upload transform notebook
+resource "databricks_notebook" "transform" {
+  source = "${path.module}/notebooks/transform.py"
+  path   = "/Workspace/notebooks/transform"
+
+  depends_on = [
+    azurerm_role_assignment.adf_databricks,
+    databricks_secret_scope.secrets
+  ]
+}
+
+# Upload load notebook
+resource "databricks_notebook" "load" {
+  source = "${path.module}/notebooks/load.py"
+  path   = "/Workspace/notebooks/load"
+
+  depends_on = [
+    azurerm_role_assignment.adf_databricks,
+    databricks_secret_scope.secrets
+  ]
+}
+
+# ========================================
+# SECTION 9: Data Factory (Orchestration)
+# ========================================
+
+# 9.1: Data Factory Resource
 resource "azurerm_data_factory" "adf" {
   name                = "adf-${var.app_name}-${substr(var.location, 0, 2)}"
   location            = azurerm_resource_group.rg.location
@@ -267,21 +305,21 @@ resource "azurerm_data_factory" "adf" {
   tags = azurerm_resource_group.rg.tags
 }
 
-# 8.2: Linked Service - Key Vault
+# 9.2: Linked Service - Key Vault
 resource "azurerm_data_factory_linked_service_key_vault" "kv" {
   name            = "ls-keyvault"
   data_factory_id = azurerm_data_factory.adf.id
   key_vault_id    = azurerm_key_vault.kv.id
 }
 
-# 8.3: Linked Service - Databricks (with Managed Identity authentication)
+# 9.3: Linked Service - Databricks (with Managed Identity authentication)
 resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
   name            = "ls-databricks"
   data_factory_id = azurerm_data_factory.adf.id
 
   # New cluster configuration (ephemeral - spins up per job, then destroys)
   new_cluster_config {
-    node_type             = "Standard_D2as_v5" # Smallest available in Sweden Central
+    node_type             = "Standard_D4ads_v6" # Smallest available in Sweden Central
     cluster_version       = "17.3.x-scala2.13" # Latest LTS Spark version
     min_number_of_workers = 1                  # Minimum cluster size
     max_number_of_workers = 1                  # Fixed size for cost control
@@ -295,7 +333,7 @@ resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
   ]
 }
 
-# 8.4: Linked Service - Azure SQL Database
+# 9.4: Linked Service - Azure SQL Database
 resource "azurerm_data_factory_linked_service_azure_sql_database" "sql" {
   name            = "ls-sql"
   data_factory_id = azurerm_data_factory.adf.id
@@ -309,28 +347,77 @@ resource "azurerm_data_factory_linked_service_azure_sql_database" "sql" {
   }
 }
 
-# 8.5: Pipeline - ETL Workflow
+# 9.5: Pipeline - ETL Workflow
 resource "azurerm_data_factory_pipeline" "etl" {
   name            = "pipeline-pollen-etl"
   data_factory_id = azurerm_data_factory.adf.id
 
-  # Pipeline contains a single Databricks Notebook activity
-  # The notebook path should match where you upload your notebook in Databricks
+  # Pipeline orchestrates Extract → Transform → Load workflow
+  # Each notebook runs sequentially on ephemeral Databricks clusters
   activities_json = jsonencode([
     {
-      name = "Run-ETL-Notebook"
+      name = "Extract"
       type = "DatabricksNotebook"
 
       dependsOn = []
 
       typeProperties = {
-        # Notebook path in Databricks workspace
-        # Upload extract.py to this path in Databricks
-        notebookPath = "/Workspace/notebooks/extract"
+        notebookPath = databricks_notebook.extract.path
 
-        # Optional: Pass parameters to your notebook
         baseParameters = {
-          # Example: environment = "production"
+          # Parameters can be added here if needed
+        }
+      }
+
+      linkedServiceName = {
+        referenceName = azurerm_data_factory_linked_service_azure_databricks.dbw.name
+        type          = "LinkedServiceReference"
+      }
+    },
+    {
+      name = "Transform"
+      type = "DatabricksNotebook"
+
+      # Transform waits for Extract to complete
+      dependsOn = [
+        {
+          activity             = "Extract"
+          dependencyConditions = ["Succeeded"]
+        }
+      ]
+
+      typeProperties = {
+        notebookPath = databricks_notebook.transform.path
+
+        baseParameters = {
+          # Parameters can be passed from Extract activity if needed
+          # Example: input_path = "@activity('Extract').output.runOutput"
+        }
+      }
+
+      linkedServiceName = {
+        referenceName = azurerm_data_factory_linked_service_azure_databricks.dbw.name
+        type          = "LinkedServiceReference"
+      }
+    },
+    {
+      name = "Load"
+      type = "DatabricksNotebook"
+
+      # Load waits for Transform to complete
+      dependsOn = [
+        {
+          activity             = "Transform"
+          dependencyConditions = ["Succeeded"]
+        }
+      ]
+
+      typeProperties = {
+        notebookPath = databricks_notebook.load.path
+
+        baseParameters = {
+          # Parameters can be passed from Transform activity if needed
+          # Example: input_path = "@activity('Transform').output.runOutput"
         }
       }
 
@@ -344,11 +431,14 @@ resource "azurerm_data_factory_pipeline" "etl" {
   depends_on = [
     azurerm_data_factory_linked_service_azure_databricks.dbw,
     azurerm_data_factory_linked_service_key_vault.kv,
-    azurerm_data_factory_linked_service_azure_sql_database.sql
+    azurerm_data_factory_linked_service_azure_sql_database.sql,
+    databricks_notebook.extract,
+    databricks_notebook.transform,
+    databricks_notebook.load
   ]
 }
 
-# 8.6: Trigger - Hourly Schedule
+# 9.6: Trigger - Hourly Schedule
 resource "azurerm_data_factory_trigger_schedule" "hourly" {
   name            = "trigger-hourly-etl"
   data_factory_id = azurerm_data_factory.adf.id

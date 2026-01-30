@@ -16,6 +16,8 @@ def transform(input_path):
         print(grb.values)
         # print(grb.keys())
 
+    # TODO: flatten data
+    # TODO: write parquet file into silver storage
     grbs.close()
     print("\n Done gribbing")
     
