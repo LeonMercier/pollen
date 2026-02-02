@@ -324,9 +324,9 @@ resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
   # New cluster configuration (ephemeral - spins up per job, then destroys)
   new_cluster_config {
     node_type             = "Standard_D4ads_v6" # Smallest available in Sweden Central
-    cluster_version       = "17.3.x-scala2.13" # Latest LTS Spark version
-    min_number_of_workers = 1                  # Minimum cluster size
-    max_number_of_workers = 1                  # Fixed size for cost control
+    cluster_version       = "17.3.x-scala2.13"  # Latest LTS Spark version
+    min_number_of_workers = 1                   # Minimum cluster size
+    max_number_of_workers = 1                   # Fixed size for cost control
   }
 
   adb_domain                 = "https://${azurerm_databricks_workspace.dbw.workspace_url}"
@@ -394,8 +394,7 @@ resource "azurerm_data_factory_pipeline" "etl" {
         notebookPath = databricks_notebook.transform.path
 
         baseParameters = {
-          # Parameters can be passed from Extract activity if needed
-          # Example: input_path = "@activity('Extract').output.runOutput"
+          input_path = "@activity('Extract').output.runOutput"
         }
       }
 
@@ -420,8 +419,7 @@ resource "azurerm_data_factory_pipeline" "etl" {
         notebookPath = databricks_notebook.load.path
 
         baseParameters = {
-          # Parameters can be passed from Transform activity if needed
-          # Example: input_path = "@activity('Transform').output.runOutput"
+          input_path = "@activity('Transform').output.runOutput"
         }
       }
 

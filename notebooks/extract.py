@@ -8,8 +8,9 @@ import shutil
 def download(api_url, api_key):
     """
     Downloads pollen forecast data from Copernicus CAMS.
-    Returns the filename of the downloaded GRIB file.
+    Returns the DBFS path of the downloaded GRIB file.
     """
+    from datetime import datetime
 
     # This part from CAMS query builder ################
     dataset = "cams-europe-air-quality-forecasts"
@@ -35,12 +36,17 @@ def download(api_url, api_key):
     # object with a .download() method
     client.retrieve(dataset, request, local_filename)
 
+    # Generate timestamped filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dbfs_filename = f"pollen_data_{timestamp}.grib"
+    dbfs_path = f"/dbfs/mnt/pollen/bronze/{dbfs_filename}"
+    
     # move local file to DBFS for next steps
-    dbfs_path = f"/dbfs/mnt/pollen/bronze/result.grib"
     os.makedirs("/dbfs/mnt/pollen/bronze", exist_ok=True)
     shutil.copy(local_filename, dbfs_path)
 
-    return local_filename  # Return for downstream processing
+    # Return DBFS path in the format expected by Databricks
+    return f"dbfs:/mnt/pollen/bronze/{dbfs_filename}"
 
 
 # Retrieve secrets from Databricks-managed secret scope
@@ -48,6 +54,9 @@ def download(api_url, api_key):
 api_url = dbutils.secrets.get(scope="secrets", key="cdsapi-url")
 api_key = dbutils.secrets.get(scope="secrets", key="cdsapi-key")
 
-# Execute download
-download(api_url, api_key)
+# Execute download and return result to ADF
+result = download(api_url, api_key)
+print(f"\nExtract complete. Output path: {result}")
+dbutils.notebook.exit(result)
+
 

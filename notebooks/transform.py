@@ -6,6 +6,15 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
+# Accept input_path parameter from ADF
+dbutils.widgets.text("input_path", "", "Input file path from Extract")
+input_path = dbutils.widgets.get("input_path")
+
+# Fallback to latest file if no parameter provided (manual testing)
+if not input_path:
+    input_path = dbutils.fs.ls("dbfs:/mnt/pollen/bronze/")[-1].path
+    print(f"No input_path provided, using latest file: {input_path}")
+
 
 def transform(input_path):
     # pygrib cannot read directly from DBFS, hence the copy operation
@@ -65,6 +74,14 @@ def transform(input_path):
 
     return dbfs_silver_path
 
-input_path = dbutils.fs.ls("dbfs:/mnt/pollen/bronze/")[-1].path
-transform(input_path)
+# Execute transformation
+result = transform(input_path)
+
+# Only exit if running in ADF (widget has value from previous activity)
+# During manual testing, widget is empty so we skip exit and show all output
+if dbutils.widgets.get("input_path"):
+    dbutils.notebook.exit(result)
+else:
+    print(f"\nManual execution complete. Output path: {result}")
+
 
