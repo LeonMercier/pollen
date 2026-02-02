@@ -26,8 +26,8 @@ def transform(input_path):
     
     grbs = pygrib.open(local_path)
     for grb in grbs:
-        print(grb)
-        print(grb.values)
+       # print(grb)
+       # print(grb.values)
         # print(grb.keys())
 
         lats, lons = grb.latlons()
@@ -38,10 +38,10 @@ def transform(input_path):
         values_flat = values.flatten()
 
         data = {
-                'variable': grb.shortName,
+                'constituent_type': grb.constituentTypeName,
                 'lat': lats_flat,
                 'lon': lons_flat,
-                'value': values_flat
+                'constituent_value': values_flat
         }
         df_temp = pd.DataFrame(data)
         all_data.append(df_temp)

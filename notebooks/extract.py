@@ -15,15 +15,18 @@ def download(api_url, api_key):
     # This part from CAMS query builder ################
     dataset = "cams-europe-air-quality-forecasts"
     request = {
-    "variable": ["birch_pollen"],
-    "model": ["ensemble"],
-    "level": ["0"],
-    "date": ["2025-04-20/2025-04-20"],
-    "type": ["forecast"],
-    "time": ["00:00"],
-    "leadtime_hour": ["0"],
-    "data_format": "grib",
-    "area": [61, 23, 60, 24]
+        "variable": [
+            "alder_pollen",
+            "birch_pollen"
+        ],
+        "model": ["ensemble"],
+        "level": ["0"],
+        "date": ["2025-04-20/2025-04-20"],
+        "type": ["forecast"],
+        "time": ["00:00"],
+        "leadtime_hour": ["0"],
+        "data_format": "grib",
+        "area": [61, 23, 60, 24]
     }
     ####################################################
 
@@ -44,6 +47,12 @@ def download(api_url, api_key):
     # move local file to DBFS for next steps
     os.makedirs("/dbfs/mnt/pollen/bronze", exist_ok=True)
     shutil.copy(local_filename, dbfs_path)
+
+    if os.path.exists(local_filename):
+        os.remove(local_filename)
+    else:
+        print("No file to remove")
+
 
     # Return DBFS path in the format expected by Databricks
     return f"dbfs:/mnt/pollen/bronze/{dbfs_filename}"
