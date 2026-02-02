@@ -250,6 +250,20 @@ resource "databricks_secret" "cdsapi_key" {
 }
 
 # ========================================
+# SECTION 7.5: Databricks Init Scripts
+# ========================================
+
+# Upload init script to Workspace (browseable in Databricks UI)
+resource "databricks_workspace_file" "init_script" {
+  source = "${path.module}/scripts/install_dependencies.sh"
+  path   = "/Shared/init_scripts/install_dependencies.sh"
+
+  depends_on = [
+    azurerm_role_assignment.adf_databricks
+  ]
+}
+
+# ========================================
 # SECTION 8: Databricks Notebooks
 # ========================================
 
@@ -327,13 +341,17 @@ resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
     cluster_version       = "17.3.x-scala2.13"  # Latest LTS Spark version
     min_number_of_workers = 1                   # Minimum cluster size
     max_number_of_workers = 1                   # Fixed size for cost control
+
+    # Init script to install Python dependencies
+    init_scripts = ["workspace:${databricks_workspace_file.init_script.path}"]
   }
 
   adb_domain                 = "https://${azurerm_databricks_workspace.dbw.workspace_url}"
   msi_work_space_resource_id = azurerm_databricks_workspace.dbw.id
 
   depends_on = [
-    azurerm_role_assignment.adf_databricks # Wait for permissions to be granted
+    azurerm_role_assignment.adf_databricks, # Wait for permissions to be granted
+    databricks_workspace_file.init_script   # Ensure init script is uploaded first
   ]
 }
 

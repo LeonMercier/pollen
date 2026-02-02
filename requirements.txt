@@ -1,3 +1,5 @@
-# This is for the whole project, azure functions has its own
+# Python dependencies for the Pollen ETL project
+# These are also installed on Databricks clusters via init script
+cdsapi
 pygrib
 pandas
