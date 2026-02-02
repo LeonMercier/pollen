@@ -30,3 +30,9 @@ variable "cdsapi_key" {
   # No default - must be provided via terraform.tfvars
 }
 
+variable "admin_email" {
+  description = "Email address for SQL database monitoring alerts"
+  type        = string
+  # No default - must be provided via terraform.tfvars
+}
+

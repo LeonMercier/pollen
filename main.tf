@@ -172,9 +172,24 @@ resource "azurerm_mssql_server" "sql" {
 resource "azurerm_mssql_database" "sqldb" {
   name      = "sqldb-${var.app_name}"
   server_id = azurerm_mssql_server.sql.id
-  sku_name  = "Basic"
 
-  max_size_gb = 2 # Basic tier limit
+  # Free Tier: Serverless General Purpose
+  sku_name = "GP_S_Gen5_1" # Max 1 vCore
+
+  # Free tier limits
+  max_size_gb = 32 # Free tier maximum
+
+  # Serverless configuration
+  auto_pause_delay_in_minutes = 60  # Auto-pause after 1 hour idle
+  min_capacity                = 0.5 # Minimum 0.5 vCores when active
+
+  # Storage redundancy (free tier requirement)
+  storage_account_type = "Local" # LRS only for free tier
+
+  # Backup retention (free tier limit)
+  short_term_retention_policy {
+    retention_days = 7 # Maximum for free tier
+  }
 
   tags = azurerm_resource_group.rg.tags
 }
@@ -186,6 +201,76 @@ resource "azurerm_mssql_firewall_rule" "allow_azure" {
   server_id        = azurerm_mssql_server.sql.id
   start_ip_address = "0.0.0.0"
   end_ip_address   = "0.0.0.0"
+}
+
+# ========================================
+# SECTION 6.5: Azure Monitor (SQL Monitoring)
+# ========================================
+
+# Action Group for vCore consumption alerts
+resource "azurerm_monitor_action_group" "sql_alerts" {
+  name                = "ag-sql-vcore-alerts"
+  resource_group_name = azurerm_resource_group.rg.name
+  short_name          = "sqlalert"
+
+  # Email notification
+  email_receiver {
+    name                    = "admin-email"
+    email_address           = var.admin_email
+    use_common_alert_schema = true
+  }
+
+  tags = azurerm_resource_group.rg.tags
+}
+
+# Alert when vCore seconds consumed reaches 90% of free limit
+resource "azurerm_monitor_metric_alert" "vcore_high_consumption" {
+  name                = "alert-sql-vcore-90pct"
+  resource_group_name = azurerm_resource_group.rg.name
+  scopes              = [azurerm_mssql_database.sqldb.id]
+  description         = "Alert when vCore consumption reaches 90% of monthly free limit (90k of 100k seconds)"
+  severity            = 2 # Warning
+  frequency           = "PT1H"
+  window_size         = "PT1H"
+
+  criteria {
+    metric_namespace = "Microsoft.Sql/servers/databases"
+    metric_name      = "app_cpu_percent"
+    aggregation      = "Average"
+    operator         = "GreaterThan"
+    threshold        = 90
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.sql_alerts.id
+  }
+
+  tags = azurerm_resource_group.rg.tags
+}
+
+# Critical alert when approaching free limit
+resource "azurerm_monitor_metric_alert" "vcore_critical_consumption" {
+  name                = "alert-sql-vcore-95pct"
+  resource_group_name = azurerm_resource_group.rg.name
+  scopes              = [azurerm_mssql_database.sqldb.id]
+  description         = "CRITICAL: vCore consumption at 95% of monthly free limit"
+  severity            = 1 # High priority
+  frequency           = "PT15M"
+  window_size         = "PT15M"
+
+  criteria {
+    metric_namespace = "Microsoft.Sql/servers/databases"
+    metric_name      = "app_cpu_percent"
+    aggregation      = "Average"
+    operator         = "GreaterThan"
+    threshold        = 95
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.sql_alerts.id
+  }
+
+  tags = azurerm_resource_group.rg.tags
 }
 
 # ========================================
