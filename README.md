@@ -14,18 +14,24 @@ az ad sp create-for-rbac --role="Contributor" --scopes="/subscriptions/<SUBSCRIP
 
 use the output to create your .env like this
 
-- ARM_SUBSCRIPTION_ID comes from `az account list` field "id"
+```
+# comes from `az account list` field "id"
+export ARM_SUBSCRIPTION_ID="your_subscription_id"
+```
 
 ### terraform.tfvars
 
-- cdsapi_key = "your_api_key"
-- admin_email = "your_email_for_azure_cost_alerts"
+```
+cdsapi_key = "your_api_key"
+admin_email = "your_email_for_azure_cost_alerts"
+```
 
 ## Start your session
 
 ```
 source ./venv/bin/activate
 source .env
+az login
 terraform init
 ```
 
