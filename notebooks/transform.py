@@ -42,6 +42,7 @@ for grb in grbs:
         "lat": lats_flat,
         "lon": lons_flat,
         "constituent_value": values_flat,
+        "analysis_date": grb.analDate,
     }
 
     # pandas data frame from dict
