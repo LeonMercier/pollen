@@ -1,19 +1,14 @@
 import cdsapi
 import os
 import shutil
+from datetime import datetime
 
 # Retrieve secrets from Databricks-managed secret scope
 # Secrets are stored securely in Databricks (encrypted at rest)
 api_url = dbutils.secrets.get(scope="secrets", key="cdsapi-url")
 api_key = dbutils.secrets.get(scope="secrets", key="cdsapi-key")
 
-"""
-Downloads pollen forecast data from Copernicus CAMS.
-Returns the DBFS path of the downloaded GRIB file.
-"""
-from datetime import datetime
-
-# This part from CAMS query builder ################
+# This part can be generated from CAMS query builder ################
 dataset = "cams-europe-air-quality-forecasts"
 request = {
     "variable": ["alder_pollen", "birch_pollen"],
