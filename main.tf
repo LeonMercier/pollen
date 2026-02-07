@@ -136,6 +136,33 @@ resource "azurerm_key_vault_secret" "sql_password" {
   depends_on = [azurerm_key_vault_access_policy.user]
 }
 
+# Store SQL Server FQDN in Databricks secret scope
+resource "databricks_secret" "sql_server_fqdn" {
+  scope        = databricks_secret_scope.secrets.name
+  key          = "sql-server-fqdn"
+  string_value = azurerm_mssql_server.sql.fully_qualified_domain_name
+
+  depends_on = [databricks_secret_scope.secrets]
+}
+
+# Store SQL admin username in Databricks secret scope
+resource "databricks_secret" "sql_admin_username" {
+  scope        = databricks_secret_scope.secrets.name
+  key          = "sql-admin-username"
+  string_value = var.sql_admin_username
+
+  depends_on = [databricks_secret_scope.secrets]
+}
+
+# Store SQL admin password in Databricks secret scope
+resource "databricks_secret" "sql_admin_password" {
+  scope        = databricks_secret_scope.secrets.name
+  key          = "sql-admin-password"
+  string_value = random_password.sql_admin.result
+
+  depends_on = [databricks_secret_scope.secrets]
+}
+
 # CDSAPI URL secret
 resource "azurerm_key_vault_secret" "cdsapi_url" {
   name         = "cdsapi-url"
