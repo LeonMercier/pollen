@@ -3,3 +3,7 @@
 cdsapi
 pygrib
 pandas
+
+# for type hints locally
+pyspark-stubs
+databricks-sdk
