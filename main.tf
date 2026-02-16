@@ -413,6 +413,17 @@ resource "databricks_notebook" "load" {
   ]
 }
 
+# Upload plot notebook
+resource "databricks_notebook" "plot" {
+  source = "${path.module}/notebooks/plot.py"
+  path   = "/Workspace/notebooks/plot"
+
+  depends_on = [
+    azurerm_role_assignment.adf_databricks,
+    databricks_secret_scope.secrets
+  ]
+}
+
 # ========================================
 # SECTION 9: Data Factory (Orchestration)
 # ========================================

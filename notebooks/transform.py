@@ -43,6 +43,7 @@ for grb in grbs:
         "lon": lons_flat,
         "constituent_value": values_flat,
         "analysis_date": grb.analDate,
+        "forecast_time": grb.forecastTime,
     }
 
     # pandas data frame from dict

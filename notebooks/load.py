@@ -40,7 +40,8 @@ BEGIN
         constituent_type NVARCHAR(50) NOT NULL,
         latitude DECIMAL(9,6) NOT NULL,
         longitude DECIMAL(9,6) NOT NULL,
-        constituent_value FLOAT NOT NULL
+        constituent_value FLOAT NOT NULL,
+        forecast_time INT NOT NULL
     );
     
     CREATE INDEX idx_forecast_time ON dbo.pollen_forecast(forecast_timestamp DESC);
@@ -70,9 +71,10 @@ except Exception as e:
 
 # read parquet file from transform step
 # raise = exception becomes fatal
+# creates spark dataframe, not exactly same as pandas dataframe
 try:
     df = spark.read.parquet(input_path)
-    print(f"✓ Read {df.count()} rows from parquet file")
+    print(f"Read {df.count()} rows from parquet file")
     print(f"Schema: {df.schema}")
 except Exception as e:
     print(f"ERROR reading parquet file: {str(e)}")
@@ -101,6 +103,7 @@ except Exception as e:
     raise
 
 # write to database
+# dataframe keys have to match SQL table colum names
 try:
     df.write.jdbc(
         url=jdbc_url,

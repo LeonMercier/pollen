@@ -29,3 +29,6 @@ crash.*.log
 
 # Databricks
 .databricks/
+
+# Other
+AGENTS.md
