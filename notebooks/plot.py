@@ -1,6 +1,10 @@
 # pyspark available by default in Databricks
 from pyspark.sql import SparkSession
 
+# NOTE: we could have skipped the whole SQL step and use just dataframes and
+# possibly parquet. But there will be other users of the data in the future
+# and so using SQL makes sense
+
 # get secrets for SQL access
 sql_server = dbutils.secrets.get(scope="secrets", key="sql-server-fqdn")
 sql_username = dbutils.secrets.get(scope="secrets", key="sql-admin-username")
@@ -29,5 +33,6 @@ except Exception as e:
     raise
 
 subset = df.filter((df.latitude == 60.95) & (df.longitude == 23.05))
-print("Dataframe: ")
-print(subset)
+
+# pyspark specific way visualize interactively
+subset.display()
