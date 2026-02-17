@@ -35,7 +35,7 @@ IF OBJECT_ID('dbo.pollen_forecast', 'U') IS NULL
 BEGIN
     CREATE TABLE dbo.pollen_forecast (
         id INT IDENTITY(1,1) PRIMARY KEY,
-        analysis_date DATETIME2 NOT NULL,
+        start_date DATETIME2 NOT NULL,
         load_timestamp DATETIME2 NOT NULL DEFAULT GETDATE(),
         constituent_type NVARCHAR(50) NOT NULL,
         latitude DECIMAL(9,6) NOT NULL,

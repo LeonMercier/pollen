@@ -1,5 +1,6 @@
 # pyspark available by default in Databricks
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import expr
 import plotly.express as px
 
 # NOTE: we could have skipped the whole SQL step and use just dataframes and
@@ -20,11 +21,6 @@ connection_properties = {
     "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
 }
 
-# query
-query = """
-    SELECT * from dbo.pollen_forecast WHERE latitude = 60.95 AND longitude = 23.05;
-"""
-
 try:
     df = spark.read.jdbc(
         jdbc_url, "dbo.pollen_forecast", properties=connection_properties
@@ -34,16 +30,26 @@ except Exception as e:
     raise
 
 df = df.filter((df.latitude == 60.95) & (df.longitude == 23.05))
-df = df.select(df.forecast_time, df.constituent_value, df.constituent_type)
+df = df.select(
+    df.start_date, df.forecast_time, df.constituent_value, df.constituent_type
+)
+
+# expr means you can do SQL
+# this is to get a nice x-axis with actual datetimes instead of just hours since
+# start of forecast
+df = df.withColumn(
+    "forecast_datetime", expr("DATEADD(hour, forecast_time, start_date)")
+)
+
 # pyspark specific way to visualize interactively
 df.display()
 
 # plotly will connect points in the order that they are in the data
-df = df.orderBy("forecast_time")
+df = df.orderBy("forecast_datetime")
 
 fig = px.line(
     df,
-    x="forecast_time",
+    x="forecast_datetime",
     y="constituent_value",
     color="constituent_type",
     title="Pollen grains in m3 of air",

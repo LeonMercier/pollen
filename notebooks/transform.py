@@ -2,7 +2,7 @@ import os
 import pygrib
 import numpy as np
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, time
 
 # Accept input_path parameter from ADF
 dbutils.widgets.text("input_path", "", "Input file path from Extract")
@@ -36,14 +36,19 @@ for grb in grbs:
     lons_flat = lons.flatten()
     values_flat = values.flatten()
 
+    # construct datetime that represents the start of the forecast
+    start_date = datetime.fromisoformat(str(grb.date))
+    start_time = time(grb.hour, 0, 0)
+    start_date = datetime.combine(start_date, start_time)
+
     # python dict
     data = {
         "constituent_type": grb.constituentTypeName,
         "lat": lats_flat,
         "lon": lons_flat,
         "constituent_value": values_flat,
-        "analysis_date": grb.analDate,
         "forecast_time": grb.forecastTime,
+        "start_date": start_date,
     }
 
     # pandas data frame from dict
