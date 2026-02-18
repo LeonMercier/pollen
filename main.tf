@@ -207,7 +207,7 @@ resource "azurerm_mssql_database" "sqldb" {
   max_size_gb = 32 # Free tier maximum
 
   # Serverless configuration
-  auto_pause_delay_in_minutes = 60  # Auto-pause after 1 hour idle
+  auto_pause_delay_in_minutes = 15  # Auto-pause after 15 min idle 
   min_capacity                = 0.5 # Minimum 0.5 vCores when active
 
   # Storage redundancy (free tier requirement)
@@ -460,7 +460,7 @@ resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
 
   # New cluster configuration (ephemeral - spins up per job, then destroys)
   new_cluster_config {
-    node_type             = "Standard_D4ads_v6" # Smallest available in Sweden Central
+    node_type             = "Standard_D2ads_v6" # Cost-optimized for daily 5-min ETL
     cluster_version       = "17.3.x-scala2.13"  # Latest LTS Spark version
     min_number_of_workers = 1                   # Minimum cluster size
     max_number_of_workers = 1                   # Fixed size for cost control
@@ -581,18 +581,19 @@ resource "azurerm_data_factory_pipeline" "etl" {
   ]
 }
 
-# 9.6: Trigger - Hourly Schedule
-resource "azurerm_data_factory_trigger_schedule" "hourly" {
-  name            = "trigger-hourly-etl"
+# 9.6: Trigger - Daily Schedule at 10:00 UTC
+resource "azurerm_data_factory_trigger_schedule" "daily" {
+  name            = "trigger-daily-etl"
   data_factory_id = azurerm_data_factory.adf.id
   pipeline_name   = azurerm_data_factory_pipeline.etl.name
 
-  frequency = "Hour"
+  frequency = "Day"
   interval  = 1
 
-  activated = false # Start disabled, hast obe enabled manually
+  activated = false # Start disabled, must be enabled manually
 
   schedule {
-    minutes = [5]
+    hours   = [10]
+    minutes = [0]
   }
 }
