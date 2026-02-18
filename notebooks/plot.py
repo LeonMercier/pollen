@@ -29,7 +29,9 @@ except Exception as e:
     print(f"WARNING: Could not read from database: {str(e)}")
     raise
 
-df = df.filter((df.latitude == 60.95) & (df.longitude == 23.05))
+# trying to get Helsinki here
+# grid is 0.10 degrees increments
+df = df.filter((df.latitude == 60.15) & (df.longitude == 24.95))
 df = df.select(
     df.start_date, df.forecast_time, df.constituent_value, df.constituent_type
 )
