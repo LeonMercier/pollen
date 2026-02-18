@@ -1,12 +1,18 @@
 import cdsapi
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
+
+# NOTE: the full forecast is guaranteed to be available daily at 10:00 UTC (but "time" in request should always be 00:00)
 
 # Retrieve secrets from Databricks-managed secret scope
 # Secrets are stored securely in Databricks (encrypted at rest)
 api_url = dbutils.secrets.get(scope="secrets", key="cdsapi-url")
 api_key = dbutils.secrets.get(scope="secrets", key="cdsapi-key")
+
+# calculate date to request most recent forecast
+req_datetime = datetime.now(timezone.utc)
+req_date = req_datetime.strftime("%Y-%m-%d")
 
 # This part can be generated from CAMS query builder ################
 dataset = "cams-europe-air-quality-forecasts"
@@ -14,7 +20,7 @@ request = {
     "variable": ["alder_pollen", "birch_pollen"],
     "model": ["ensemble"],
     "level": ["0"],
-    "date": ["2025-04-16/2025-04-16"],
+    "date": [f"{req_date}/{req_date}"],
     "type": ["forecast"],
     "time": ["00:00"],
     "leadtime_hour": [
