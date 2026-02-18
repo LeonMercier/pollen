@@ -597,3 +597,47 @@ resource "azurerm_data_factory_trigger_schedule" "daily" {
     minutes = [0]
   }
 }
+
+# ========================================
+# SECTION 10: Static Website Hosting
+# ========================================
+
+# Storage account for hosting static HTML charts
+# This enables the plot.py notebook to generate and publish Plotly charts
+# that are publicly accessible via HTTPS
+resource "azurerm_storage_account" "web" {
+  name                     = "stweb${var.app_name}${random_string.unique.result}"
+  resource_group_name      = azurerm_resource_group.rg.name
+  location                 = azurerm_resource_group.rg.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS" # Locally redundant storage (free tier)
+
+  tags = azurerm_resource_group.rg.tags
+}
+
+# Enable static website hosting on the storage account
+# Files uploaded to $web container are served via primary_web_endpoint
+resource "azurerm_storage_account_static_website" "web" {
+  storage_account_id = azurerm_storage_account.web.id
+  index_document     = "index.html"
+}
+
+# Store storage account name in Databricks secrets
+# Used by plot.py to authenticate and upload generated HTML
+resource "databricks_secret" "storage_account_name" {
+  scope        = databricks_secret_scope.secrets.name
+  key          = "web-storage-account-name"
+  string_value = azurerm_storage_account.web.name
+
+  depends_on = [databricks_secret_scope.secrets]
+}
+
+# Store storage account key in Databricks secrets
+# Access key allows plot.py to write HTML files to blob storage
+resource "databricks_secret" "storage_account_key" {
+  scope        = databricks_secret_scope.secrets.name
+  key          = "web-storage-account-key"
+  string_value = azurerm_storage_account.web.primary_access_key
+
+  depends_on = [databricks_secret_scope.secrets]
+}

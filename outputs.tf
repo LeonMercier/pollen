@@ -111,3 +111,23 @@ output "sql_free_tier_limits" {
     auto_pause_minutes = 60
   }
 }
+
+# ========================================
+# Static Website Outputs
+# ========================================
+
+output "static_website_url" {
+  description = "URL to access the static website hosting Plotly charts"
+  value       = azurerm_storage_account.web.primary_web_endpoint
+}
+
+output "web_storage_account_name" {
+  description = "Storage account name for static website (used by plot.py)"
+  value       = azurerm_storage_account.web.name
+}
+
+output "web_storage_account_key" {
+  description = "Storage account primary access key (sensitive - use: terraform output -raw web_storage_account_key)"
+  value       = azurerm_storage_account.web.primary_access_key
+  sensitive   = true
+}
