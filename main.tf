@@ -568,6 +568,31 @@ resource "azurerm_data_factory_pipeline" "etl" {
         referenceName = azurerm_data_factory_linked_service_azure_databricks.dbw.name
         type          = "LinkedServiceReference"
       }
+    },
+    {
+      name = "Plot"
+      type = "DatabricksNotebook"
+
+      # Plot waits for Load to complete
+      dependsOn = [
+        {
+          activity             = "Load"
+          dependencyConditions = ["Succeeded"]
+        }
+      ]
+
+      typeProperties = {
+        notebookPath = databricks_notebook.plot.path
+
+        baseParameters = {
+          # No parameters needed for plot
+        }
+      }
+
+      linkedServiceName = {
+        referenceName = azurerm_data_factory_linked_service_azure_databricks.dbw.name
+        type          = "LinkedServiceReference"
+      }
     }
   ])
 
@@ -577,7 +602,8 @@ resource "azurerm_data_factory_pipeline" "etl" {
     azurerm_data_factory_linked_service_azure_sql_database.sql,
     databricks_notebook.extract,
     databricks_notebook.transform,
-    databricks_notebook.load
+    databricks_notebook.load,
+    databricks_notebook.plot
   ]
 }
 

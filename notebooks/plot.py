@@ -1,7 +1,8 @@
-# pyspark available by default in Databricks
+import os
+import plotly.express as px
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import expr
-import plotly.express as px
+from azure.storage.blob import BlobServiceClient, ContentSettings
 
 # NOTE: we could have skipped the whole SQL step and use just dataframes and
 # possibly parquet. But there will be other users of the data in the future
@@ -58,3 +59,45 @@ fig = px.line(
     markers=True,
 )
 fig.show()
+
+fig.write_html("/tmp/fig1.html", include_plotlyjs="cdn")
+
+# Upload to website
+
+# Get storage credentials from Databricks secrets
+storage_account_name = dbutils.secrets.get(
+    scope="secrets", key="web-storage-account-name"
+)
+storage_account_key = dbutils.secrets.get(
+    scope="secrets", key="web-storage-account-key"
+)
+
+# Create blob service client
+blob_service_client = BlobServiceClient(
+    account_url=f"https://{storage_account_name}.blob.core.windows.net",
+    credential=storage_account_key,
+)
+
+# Upload to $web container (static website hosting container)
+container_name = "$web"
+blob_name = "index.html"
+
+try:
+    blob_client = blob_service_client.get_blob_client(
+        container=container_name, blob=blob_name
+    )
+
+    with open("/tmp/fig1.html", "rb") as data:
+        blob_client.upload_blob(
+            data,
+            overwrite=True,
+            content_settings=ContentSettings(content_type="text/html"),
+        )
+
+except Exception as e:
+    print(f"ERROR uploading chart to blob storage: {str(e)}")
+    raise
+
+# Clean up local temporary file
+if os.path.exists("/tmp/fig1.html"):
+    os.remove("/tmp/fig1.html")
