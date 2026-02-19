@@ -49,8 +49,10 @@ source .env
 az login
 ```
 
-## Deploy changes
+## Create the infrastructure
 
 ```
 terraform apply
 ```
+
+This will create all the infra on Azure. The pipeline will be set to disabled on Data Factory and you will need to enable it manually.For testing, it is better to spin up a Databricks cluster manually from the Databricks workspace. When doing that remember to set the cluster init script to the one that is uploaded under shared files.
