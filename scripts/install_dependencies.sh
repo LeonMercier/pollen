@@ -8,6 +8,5 @@ echo "Installing Python dependencies..."
 
 # pandas and numpy are preinstalled on Databricks
 pip install --upgrade pip
-pip install cdsapi pygrib
-
+pip install cdsapi pygrib azure-storage-blob
 echo "Dependencies installed successfully!"
