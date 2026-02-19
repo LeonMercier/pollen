@@ -32,7 +32,7 @@ Run `az account list` and use the field 'id' to create a `.env` file that looks 
 export ARM_SUBSCRIPTION_ID="your_subscription_id"
 ```
 
-The rest of your environment will be managed by Terraform. Create a terraform.tfvars file:
+The rest of your environment will be managed by Terraform. Information about the CDS API keys [here](https://ads.atmosphere.copernicus.eu/how-to-api). Create a terraform.tfvars file:
 
 ```
 cdsapi_key = "your_api_key"
