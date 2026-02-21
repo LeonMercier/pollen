@@ -48,6 +48,11 @@ def plot(latitude, longitude, name, sqlconn):
         color="constituent_type",
         title=name,
         markers=True,
+        labels=dict(
+            forecast_datetime="Time",
+            constituent_value="Pollen grains in m3 of air",
+            constituent_type="Pollen type",
+        ),
     )
     fig.show()
 
