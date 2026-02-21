@@ -46,12 +46,12 @@ def plot(latitude, longitude, name, sqlconn):
         x="forecast_datetime",
         y="constituent_value",
         color="constituent_type",
-        title="Pollen grains in m3 of air",
+        title=name,
         markers=True,
     )
     fig.show()
 
-    fig.write_html(f"/tmp/{name}.html", include_plotlyjs="cdn")
+    return fig.to_html(full_html=False, include_plotlyjs="cdn")
 
 
 # get secrets for SQL access
@@ -76,9 +76,28 @@ locations = [
     {"lat": 41.85, "lon": 12.55, "name": "Rome"},
 ]
 
-# create plots and save to /tmp
+# create plots and save into an list
+plots = []
 for l in locations:
-    plot(l["lat"], l["lon"], l["name"], connection_properties)
+    plots.append(plot(l["lat"], l["lon"], l["name"], connection_properties))
+
+# create the HTML, join loops through the array and adds a separator
+combined_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pollen Forecasts</title>
+</head>
+<body>
+    <h1>Pollen Forecasts</h1>
+    {'<hr>'.join(plots)}
+</body>
+</html>
+"""
+
+tmp_name = "/tmp/index.html"
+with open(tmp_name, "w") as f:
+    f.write(combined_html)
 
 # Get storage credentials from Databricks secrets
 storage_account_name = dbutils.secrets.get(
@@ -97,25 +116,23 @@ blob_service_client = BlobServiceClient(
 # Upload to $web container (static website hosting container)
 container_name = "$web"
 
-for l in locations:
-    tmp_name = f"/tmp/{l["name"]}.html"
-    blob_name = f"{l["name"]}.html"
-    try:
-        blob_client = blob_service_client.get_blob_client(
-            container=container_name, blob=blob_name
+blob_name = "index.html"
+try:
+    blob_client = blob_service_client.get_blob_client(
+        container=container_name, blob=blob_name
+    )
+
+    with open(tmp_name, "rb") as data:
+        blob_client.upload_blob(
+            data,
+            overwrite=True,
+            content_settings=ContentSettings(content_type="text/html"),
         )
 
-        with open(tmp_name, "rb") as data:
-            blob_client.upload_blob(
-                data,
-                overwrite=True,
-                content_settings=ContentSettings(content_type="text/html"),
-            )
+except Exception as e:
+    print(f"ERROR uploading chart to blob storage: {str(e)}")
+    raise
 
-    except Exception as e:
-        print(f"ERROR uploading chart to blob storage: {str(e)}")
-        raise
-
-    # Clean up local temporary file
-    if os.path.exists(tmp_name):
-        os.remove(tmp_name)
+# Clean up local temporary file
+if os.path.exists(tmp_name):
+    os.remove(tmp_name)
