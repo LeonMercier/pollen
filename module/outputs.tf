@@ -85,34 +85,6 @@ output "data_factory_principal_id" {
 }
 
 # ========================================
-# Monitoring Outputs
-# ========================================
-
-output "sql_monitoring_action_group_id" {
-  description = "Action Group ID for SQL monitoring alerts"
-  value       = azurerm_monitor_action_group.sql_alerts.id
-}
-
-output "sql_vcore_alert_info" {
-  description = "Information about vCore monitoring alerts"
-  value = {
-    warning_alert_id  = azurerm_monitor_metric_alert.vcore_high_consumption.id
-    critical_alert_id = azurerm_monitor_metric_alert.vcore_critical_consumption.id
-    monitoring_email  = var.admin_email
-  }
-}
-
-output "sql_free_tier_limits" {
-  description = "Free tier monthly limits"
-  value = {
-    vcore_seconds      = "100,000"
-    max_storage_gb     = 32
-    backup_storage_gb  = 32
-    auto_pause_minutes = 60
-  }
-}
-
-# ========================================
 # Static Website Outputs
 # ========================================
 

@@ -2,6 +2,8 @@
 # SECTION 1: Terraform & Provider Configuration
 # ========================================
 
+# While providers are configured in the root config, provider requirements
+# for the module are defined (also) here in the module
 terraform {
   required_version = ">= 1.1.0"
 
@@ -21,33 +23,12 @@ terraform {
   }
 }
 
-provider "azurerm" {
-  features {
-    # Key Vault settings for easier development workflow
-    key_vault {
-      purge_soft_delete_on_destroy    = true # Allows immediate recreation
-      recover_soft_deleted_key_vaults = true
-    }
-  }
-
-  use_cli = true
-}
-
-# Databricks provider - uses Azure CLI authentication
-# Terraform knows to create the azure resource below first, then use it here
-provider "databricks" {
-  host = azurerm_databricks_workspace.dbw.workspace_url
-}
-
-# For generating random passwords
-provider "random" {}
-
 # ========================================
 # SECTION 2: Data Sources
 # ========================================
 
 # Get current Azure client configuration (for tenant ID, object ID)
-# Essentially because I am logged in with `az login`, Terraform can query
+# Essentially when you are logged in with `az login`, Terraform can query
 # this information on its own
 data "azurerm_client_config" "current" {}
 
@@ -78,10 +59,11 @@ resource "random_password" "sql_admin" {
 # ========================================
 
 resource "azurerm_resource_group" "rg" {
-  name     = "rg-${var.app_name}-${substr(var.location, 0, 2)}"
+  name     = "rg-${var.app_name}-${var.environment}-${substr(var.location, 0, 2)}"
   location = var.location
 
   tags = {
+    Environment = var.environment
     ManagedBy = "Terraform"
     Project   = "Pollen-ETL"
   }
@@ -200,8 +182,7 @@ resource "azurerm_mssql_database" "sqldb" {
   name      = "sqldb-${var.app_name}"
   server_id = azurerm_mssql_server.sql.id
 
-  # Free Tier: Serverless General Purpose
-  sku_name = "GP_S_Gen5_1" # Max 1 vCore
+  sku_name = var.sql_sku_name
 
   # Free tier limits
   max_size_gb = 32 # Free tier maximum
@@ -226,78 +207,10 @@ resource "azurerm_mssql_database" "sqldb" {
 resource "azurerm_mssql_firewall_rule" "allow_azure" {
   name             = "AllowAzureServices"
   server_id        = azurerm_mssql_server.sql.id
+  # 0.0.0.0 is a spacial value allowing everything isnide of Azure
+  # https://learn.microsoft.com/fi-fi/rest/api/sql/firewall-rules/create-or-update
   start_ip_address = "0.0.0.0"
   end_ip_address   = "0.0.0.0"
-}
-
-# ========================================
-# SECTION 6.5: Azure Monitor (SQL Monitoring)
-# ========================================
-
-# Action Group for vCore consumption alerts
-resource "azurerm_monitor_action_group" "sql_alerts" {
-  name                = "ag-sql-vcore-alerts"
-  resource_group_name = azurerm_resource_group.rg.name
-  short_name          = "sqlalert"
-
-  # Email notification
-  email_receiver {
-    name                    = "admin-email"
-    email_address           = var.admin_email
-    use_common_alert_schema = true
-  }
-
-  tags = azurerm_resource_group.rg.tags
-}
-
-# Alert when vCore seconds consumed reaches 90% of free limit
-resource "azurerm_monitor_metric_alert" "vcore_high_consumption" {
-  name                = "alert-sql-vcore-90pct"
-  resource_group_name = azurerm_resource_group.rg.name
-  scopes              = [azurerm_mssql_database.sqldb.id]
-  description         = "Alert when vCore consumption reaches 90% of monthly free limit (90k of 100k seconds)"
-  severity            = 2 # Warning
-  frequency           = "PT1H"
-  window_size         = "PT1H"
-
-  criteria {
-    metric_namespace = "Microsoft.Sql/servers/databases"
-    metric_name      = "app_cpu_percent"
-    aggregation      = "Average"
-    operator         = "GreaterThan"
-    threshold        = 90
-  }
-
-  action {
-    action_group_id = azurerm_monitor_action_group.sql_alerts.id
-  }
-
-  tags = azurerm_resource_group.rg.tags
-}
-
-# Critical alert when approaching free limit
-resource "azurerm_monitor_metric_alert" "vcore_critical_consumption" {
-  name                = "alert-sql-vcore-95pct"
-  resource_group_name = azurerm_resource_group.rg.name
-  scopes              = [azurerm_mssql_database.sqldb.id]
-  description         = "CRITICAL: vCore consumption at 95% of monthly free limit"
-  severity            = 1 # High priority
-  frequency           = "PT15M"
-  window_size         = "PT15M"
-
-  criteria {
-    metric_namespace = "Microsoft.Sql/servers/databases"
-    metric_name      = "app_cpu_percent"
-    aggregation      = "Average"
-    operator         = "GreaterThan"
-    threshold        = 95
-  }
-
-  action {
-    action_group_id = azurerm_monitor_action_group.sql_alerts.id
-  }
-
-  tags = azurerm_resource_group.rg.tags
 }
 
 # ========================================
@@ -367,7 +280,7 @@ resource "databricks_secret" "cdsapi_key" {
 
 # Upload init script to Workspace (browseable in Databricks UI)
 resource "databricks_workspace_file" "init_script" {
-  source = "${path.module}/scripts/install_dependencies.sh"
+  source = "${path.module}/../scripts/install_dependencies.sh"
   path   = "/Shared/init_scripts/install_dependencies.sh"
 
   depends_on = [
@@ -381,7 +294,7 @@ resource "databricks_workspace_file" "init_script" {
 
 # Upload extract notebook
 resource "databricks_notebook" "extract" {
-  source = "${path.module}/notebooks/extract.py"
+  source = "${path.module}/../notebooks/extract.py"
   path   = "/Workspace/notebooks/extract"
 
   # Ensure workspace and permissions are ready
@@ -393,7 +306,7 @@ resource "databricks_notebook" "extract" {
 
 # Upload transform notebook
 resource "databricks_notebook" "transform" {
-  source = "${path.module}/notebooks/transform.py"
+  source = "${path.module}/../notebooks/transform.py"
   path   = "/Workspace/notebooks/transform"
 
   depends_on = [
@@ -404,7 +317,7 @@ resource "databricks_notebook" "transform" {
 
 # Upload load notebook
 resource "databricks_notebook" "load" {
-  source = "${path.module}/notebooks/load.py"
+  source = "${path.module}/../notebooks/load.py"
   path   = "/Workspace/notebooks/load"
 
   depends_on = [
@@ -415,7 +328,7 @@ resource "databricks_notebook" "load" {
 
 # Upload plot notebook
 resource "databricks_notebook" "plot" {
-  source = "${path.module}/notebooks/plot.py"
+  source = "${path.module}/../notebooks/plot.py"
   path   = "/Workspace/notebooks/plot"
 
   depends_on = [
@@ -460,7 +373,7 @@ resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
 
   # New cluster configuration (ephemeral - spins up per job, then destroys)
   new_cluster_config {
-    node_type             = "Standard_D2ads_v6" # Cost-optimized for daily 5-min ETL
+    node_type             = var.databricks_node_type
     cluster_version       = "17.3.x-scala2.13"  # Latest LTS Spark version
     min_number_of_workers = 1                   # Minimum cluster size
     max_number_of_workers = 1                   # Fixed size for cost control
@@ -469,8 +382,8 @@ resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
     init_scripts = ["workspace:${databricks_workspace_file.init_script.path}"]
   }
 
-  adb_domain                 = "https://${azurerm_databricks_workspace.dbw.workspace_url}"
-  msi_work_space_resource_id = azurerm_databricks_workspace.dbw.id
+  adb_domain       = "https://${azurerm_databricks_workspace.dbw.workspace_url}"
+  msi_workspace_id = azurerm_databricks_workspace.dbw.id
 
   depends_on = [
     azurerm_role_assignment.adf_databricks, # Wait for permissions to be granted
@@ -616,7 +529,7 @@ resource "azurerm_data_factory_trigger_schedule" "daily" {
   frequency = "Day"
   interval  = 1
 
-  activated = false # Start disabled, must be enabled manually
+  activated = var.adf_trigger_activated
 
   schedule {
     hours   = [10]
