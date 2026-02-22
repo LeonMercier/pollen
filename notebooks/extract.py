@@ -17,7 +17,14 @@ req_date = req_datetime.strftime("%Y-%m-%d")
 # This part can be generated from CAMS query builder ################
 dataset = "cams-europe-air-quality-forecasts"
 request = {
-    "variable": ["alder_pollen", "birch_pollen"],
+    "variable": [
+        "alder_pollen",
+        "birch_pollen",
+        "grass_pollen",
+        "mugwort_pollen",
+        "olive_pollen",
+        "ragweed_pollen",
+    ],
     "model": ["ensemble"],
     "level": ["0"],
     "date": [f"{req_date}/{req_date}"],
