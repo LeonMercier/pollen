@@ -1,9 +1,9 @@
 variable "environment" {
   description = "Environment name (dev or prod)"
-  type = string
+  type        = string
   validation {
     # contains() => the set contains at least one value matching the variable
-    condition = contains(["dev", "prod"], var.environment)
+    condition     = contains(["dev", "prod"], var.environment)
     error_message = "Environment must be 'dev' or 'prod'."
   }
 }
@@ -42,15 +42,21 @@ variable "admin_email" {
 
 variable "sql_sku_name" {
   description = "SKU for the SQL server"
-  type = string
+  type        = string
 }
 
 variable "databricks_node_type" {
   description = "SKU for Databricks compute"
-  type = string
+  type        = string
 }
 
 variable "adf_trigger_activated" {
   description = "Should the Data Factory pipeline start as activated"
-  type = bool
+  type        = bool
+}
+
+variable "web_storage_suffix" {
+  description = "Suffix for static website storage account name (use explicit value for prod to ensure stable URL, leave empty to use random string)"
+  type        = string
+  default     = ""
 }

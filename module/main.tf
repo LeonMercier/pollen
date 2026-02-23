@@ -64,8 +64,8 @@ resource "azurerm_resource_group" "rg" {
 
   tags = {
     Environment = var.environment
-    ManagedBy = "Terraform"
-    Project   = "Pollen-ETL"
+    ManagedBy   = "Terraform"
+    Project     = "Pollen-ETL"
   }
 }
 
@@ -205,8 +205,8 @@ resource "azurerm_mssql_database" "sqldb" {
 # Allow Azure services to access SQL Server (required for Data Factory, Databricks)
 # A separate rule can be created to allow direct access from outside
 resource "azurerm_mssql_firewall_rule" "allow_azure" {
-  name             = "AllowAzureServices"
-  server_id        = azurerm_mssql_server.sql.id
+  name      = "AllowAzureServices"
+  server_id = azurerm_mssql_server.sql.id
   # 0.0.0.0 is a spacial value allowing everything isnide of Azure
   # https://learn.microsoft.com/fi-fi/rest/api/sql/firewall-rules/create-or-update
   start_ip_address = "0.0.0.0"
@@ -343,7 +343,7 @@ resource "databricks_notebook" "plot" {
 
 # 9.1: Data Factory Resource
 resource "azurerm_data_factory" "adf" {
-  name                = "adf-${var.app_name}-${substr(var.location, 0, 2)}"
+  name                = "adf-${var.app_name}-${var.environment}-${random_string.unique.result}"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 
@@ -374,9 +374,9 @@ resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
   # New cluster configuration (ephemeral - spins up per job, then destroys)
   new_cluster_config {
     node_type             = var.databricks_node_type
-    cluster_version       = "17.3.x-scala2.13"  # Latest LTS Spark version
-    min_number_of_workers = 1                   # Minimum cluster size
-    max_number_of_workers = 1                   # Fixed size for cost control
+    cluster_version       = "17.3.x-scala2.13" # Latest LTS Spark version
+    min_number_of_workers = 1                  # Minimum cluster size
+    max_number_of_workers = 1                  # Fixed size for cost control
 
     # Init script to install Python dependencies
     init_scripts = ["workspace:${databricks_workspace_file.init_script.path}"]
@@ -541,11 +541,17 @@ resource "azurerm_data_factory_trigger_schedule" "daily" {
 # SECTION 10: Static Website Hosting
 # ========================================
 
+# Determine suffix for web storage account
+# Use explicit suffix for prod (stable URL), or random for dev
+locals {
+  web_suffix = var.web_storage_suffix != "" ? var.web_storage_suffix : random_string.unique.result
+}
+
 # Storage account for hosting static HTML charts
 # This enables the plot.py notebook to generate and publish Plotly charts
 # that are publicly accessible via HTTPS
 resource "azurerm_storage_account" "web" {
-  name                     = "stweb${var.app_name}${random_string.unique.result}"
+  name                     = "stweb${var.app_name}${local.web_suffix}"
   resource_group_name      = azurerm_resource_group.rg.name
   location                 = azurerm_resource_group.rg.location
   account_tier             = "Standard"
