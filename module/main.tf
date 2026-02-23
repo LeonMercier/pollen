@@ -379,7 +379,7 @@ resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
     max_number_of_workers = 1                  # Fixed size for cost control
 
     # Init script to install Python dependencies
-    init_scripts = ["workspace:${databricks_workspace_file.init_script.path}"]
+    init_scripts = [databricks_workspace_file.init_script.path]
   }
 
   adb_domain       = "https://${azurerm_databricks_workspace.dbw.workspace_url}"
