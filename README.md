@@ -1,6 +1,6 @@
 # Pollen ETL project
 
-This is a work in progress ETL project for visualizing pollen forecast data from [the EU Copernicus programme](https://atmosphere.copernicus.eu/). The pipeline is deployed on Azure and you can see outputs live [here](https://stwebpollenprod.z1.web.core.windows.net/), with updates once per day!!
+This is a work in progress ETL pipeline for visualizing pollen forecast data from [the EU Copernicus programme](https://atmosphere.copernicus.eu/). The pipeline is deployed on Azure and you can see outputs live [here](https://stwebpollenprod.z1.web.core.windows.net/), with updates once per day!!
 
 Check out the project description and goals [here](showcase.pdf).
 
