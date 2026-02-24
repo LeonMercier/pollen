@@ -43,7 +43,7 @@ cdsapi_key = "your_api_key"
 admin_email = "your_email_for_azure_cost_alerts"
 ```
 
-And finally run `terraform init`.
+And finally run `terraform init` in `environments/dev` and `environemnts/prod`.
 
 ## Start your development session
 
