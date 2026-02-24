@@ -1,4 +1,6 @@
-## Extract
+# Pollen ETL project
+
+You can see the project description and goals [here](showcase.pdf).
 
 ## Setting up the dev environment
 
