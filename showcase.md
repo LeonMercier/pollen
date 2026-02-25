@@ -125,7 +125,7 @@ Static site: [https://stwebpollenprod.z1.web.core.windows.net/](https://stwebpol
 
 \normalsize
 
-![image](static-site-screenshot-2026-02-23-cropped.png)
+![image](../static-site-screenshot-2026-02-23-cropped.png)
 
 # Infrastructure
 
