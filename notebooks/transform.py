@@ -3,6 +3,28 @@ import pygrib
 import numpy as np
 import pandas as pd
 from datetime import datetime, time
+from functools import reduce
+from pyspark.sql import DataFrame
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    StringType,
+    DoubleType,
+    IntegerType,
+    TimestampType,
+)
+
+# detect if local or cloud
+if "DATABRICKS_RUNTIME_VERSION" in os.environ:
+    print("Running in cluster")
+else:
+    print("Running locally")
+    import pyspark
+    from databricks.sdk import WorkspaceClient
+
+    w = WorkspaceClient()
+    dbutils = w.dbutils
+    spark = pyspark.sql.SparkSession.builder.getOrCreate()
 
 # Accept input_path parameter from ADF
 dbutils.widgets.text("input_path", "", "Input file path from Extract")
@@ -17,8 +39,21 @@ if not input_path:
 local_path = "/tmp/temp_grib_file.grib"
 dbutils.fs.cp(input_path, "file:" + local_path)
 
-# Collect all data from all GRIB messages
-all_data = []
+# (pyspark) Define the schema
+schema = StructType(
+    [
+        StructField("constituent_type", StringType(), nullable=False),
+        StructField("lat", DoubleType(), nullable=False),
+        StructField("lon", DoubleType(), nullable=False),
+        StructField("constituent_value", DoubleType(), nullable=True),
+        StructField("forecast_time", IntegerType(), nullable=False),
+        StructField("start_date", TimestampType(), nullable=False),
+    ]
+)
+
+# Create directory for temp files
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+temp_parquet_dir = f"dbfs:/tmp/grib_temp_{timestamp}/"
 
 grbs = pygrib.open(local_path)
 for grb in grbs:
@@ -41,48 +76,39 @@ for grb in grbs:
     start_time = time(grb.hour, 0, 0)
     start_date = datetime.combine(start_date, start_time)
 
-    # python dict
-    data = {
-        "constituent_type": grb.constituentTypeName,
-        "lat": lats_flat,
-        "lon": lons_flat,
-        "constituent_value": values_flat,
-        "forecast_time": grb.forecastTime,
-        "start_date": start_date,
-    }
+    # pandas dataframe (of a single grib message)
+    pdf = pd.DataFrame(
+        {
+            "constituent_type": grb.constituentTypeName,
+            "lat": lats_flat,
+            "lon": lons_flat,
+            "constituent_value": values_flat,
+            "forecast_time": grb.forecastTime,
+            "start_date": start_date,
+        }
+    )
+    # pandas to spark
+    tmp_df = spark.createDataFrame(pdf, schema=schema)
 
-    # pandas data frame from dict
-    # by default, keys become column names
-    df_temp = pd.DataFrame(data)
-
-    # array of data frames
-    all_data.append(df_temp)
-
-    print(df_temp)
+    # write to disk: we just use a directory and spark will handle the filenames inside automatically
+    tmp_df.write.mode("append").parquet(temp_parquet_dir)
 
 grbs.close()
 
-# remove downloaded temp file
-if os.path.exists(local_path):
-    os.remove(local_path)
-
-# Combine all data into a single DataFrame
-df = pd.concat(all_data, ignore_index=True)
-print(f"\nCombined DataFrame with {len(df)} rows")
+# read all files from temp dir (spark read all files in dir)
+df = spark.read.parquet(temp_parquet_dir)
+print(f"Created final dataframe with {df.count()} rows")
 
 # Write DataFrame to DBFS silver folder as parquet
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-output_path = f"/tmp/grib_data_{timestamp}.parquet"  # python F-string
-df.to_parquet(output_path)
-
 dbfs_silver_path = f"dbfs:/mnt/pollen/silver/grib_data_{timestamp}.parquet"
-dbutils.fs.cp("file:" + output_path, dbfs_silver_path)
-
-# remove created temp file
-if os.path.exists(output_path):
-    os.remove(output_path)
+df.write.mode("overwrite").parquet(dbfs_silver_path)
 
 print(f"Written to {dbfs_silver_path}")
+
+# cleanup
+if os.path.exists(local_path):
+    os.remove(local_path)
+dbutils.fs.rm(temp_parquet_dir, recurse=True)
 
 # think of as a return value
 result = dbfs_silver_path
