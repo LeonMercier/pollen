@@ -142,6 +142,7 @@ local_filename = "result.grib"
 # when filename is passed as argument, returns a string, NOT a Result
 # object with a .download() method
 client.retrieve(dataset, request, local_filename)
+print(f"Downloaded {os.path.getsize(local_filename):_} bytes")
 
 # Generate timestamped filename
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

@@ -11,7 +11,7 @@ Clone this repo and then do the following:
 Create local python environment. The code cannot run locally, but at least you can get hints in your IDE.
 
 ```
-python3.13 -m venv .venv
+python3.12 -m venv .venv
 source ./venv/bin/activate
 pip install -r requirements.txt
 ```
