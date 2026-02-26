@@ -57,6 +57,7 @@ END
 """
 
 # execute database creation
+# The 'spark' object exists already because of the Databricks environment.
 try:
     connection = spark._jvm.java.sql.DriverManager.getConnection(
         jdbc_url, sql_username, sql_password
@@ -74,7 +75,6 @@ except Exception as e:
 # creates spark dataframe, not exactly same as pandas dataframe
 try:
     df = spark.read.parquet(input_path)
-    print(f"Read {df.count()} rows from parquet file")
     print(f"Schema: {df.schema}")
 except Exception as e:
     print(f"ERROR reading parquet file: {str(e)}")
@@ -89,6 +89,7 @@ df.printSchema()
 
 # truncate = remove all rows, but keep table structure
 # never gets here if parquet loading fails
+# TODO: createentirely new table and swap once done
 truncate_sql = "TRUNCATE TABLE dbo.pollen_forecast"
 try:
     connection = spark._jvm.java.sql.DriverManager.getConnection(
@@ -104,6 +105,7 @@ except Exception as e:
 
 # write to database
 # dataframe keys have to match SQL table colum names
+# TODO: change options of write to parallelize better
 try:
     df.write.jdbc(
         url=jdbc_url,
@@ -111,31 +113,7 @@ try:
         mode="append",  # Append after truncate = replace
         properties=connection_properties,
     )
-
-    row_count = df.count()
-    print(f"Successfully loaded {row_count} rows into SQL database")
+    print(f"Successfully loaded data into SQL database")
 except Exception as e:
     print(f"ERROR loading data to SQL: {str(e)}")
     raise
-
-# verification (read back and compare)
-try:
-    sql_df = spark.read.jdbc(
-        jdbc_url, "dbo.pollen_forecast", properties=connection_properties
-    )
-    sql_row_count = sql_df.count()
-
-    print(f"Verification: {sql_row_count} rows in SQL table")
-
-    if sql_row_count != row_count:
-        print(
-            f"WARNING: Row count mismatch! Expected {row_count}, found {sql_row_count}"
-        )
-    else:
-        print("Row count verification passed")
-
-except Exception as e:
-    print(f"WARNING: Could not verify load: {str(e)}")
-    # Don't raise - data might still be loaded successfully
-
-# Note: load.py doesn't need to return a value since it's the final step
