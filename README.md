@@ -6,11 +6,11 @@ Check out the project description and goals [here](showcase.pdf).
 
 ## Tech used
 
-Orchestration: Azure Data Factory
-Compute: pySpark on Databricks
-Database: Azure SQL serverless
-Visualizations: plotly
-Infrastructure as Code: Terraform
+- Orchestration: Azure Data Factory
+- Compute: pySpark on Databricks
+- Database: Azure SQL serverless
+- Visualizations: plotly
+- Infrastructure as Code: Terraform
 
 ## Setting up the dev environment
 
