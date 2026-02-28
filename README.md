@@ -4,6 +4,14 @@ This is a work in progress ETL pipeline for visualizing pollen forecast data fro
 
 Check out the project description and goals [here](showcase.pdf).
 
+## Tech used
+
+Orchestration: Azure Data Factory
+Compute: pySpark on Databricks
+Database: Azure SQL serverless
+Visualizations: plotly
+Infrastructure as Code: Terraform
+
 ## Setting up the dev environment
 
 Clone this repo and then do the following:
