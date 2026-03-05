@@ -1,4 +1,5 @@
 import os
+import gc
 import pygrib
 import numpy as np
 import pandas as pd
@@ -55,7 +56,18 @@ schema = StructType(
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 temp_parquet_dir = f"dbfs:/tmp/grib_temp_{timestamp}/"
 
+# Accumulate BATCH_SIZE GRIB messages into one pandas dataframe,
+# then turn into pySpark dataframe and write to disk.
+# The goal is to prevent loading the whole dataset into memory as one giant
+# pandas dataframe. Simultaneously we want to avoid the overhead from too many
+# Spark jobs, hence the batching.
+BATCH_SIZE = 100
+df_batch = []
+grb_count = 0
+batch_number = 0
+
 grbs = pygrib.open(local_path)
+
 for grb in grbs:
     # print(grb)
     # print(grb.values)
@@ -87,12 +99,42 @@ for grb in grbs:
             "start_date": start_date,
         }
     )
-    # pandas to spark
-    tmp_df = spark.createDataFrame(pdf, schema=schema)
 
-    # write to disk: we just use a directory and spark will handle the filenames inside automatically
-    tmp_df.write.mode("append").parquet(temp_parquet_dir)
+    df_batch.append(pdf)
+    grb_count += 1
 
+    if len(df_batch) >= BATCH_SIZE:
+        batch_number += 1
+        print(f"Processing batch {batch_number}: {len(df_batch)} messages")
+        concat_df = pd.concat(df_batch, ignore_index=True)
+        # pandas to spark
+        tmp_df = spark.createDataFrame(concat_df, schema=schema)
+        # reduce partitioning (because each partition will turn into a file)
+        tmp_df = tmp_df.coalesce(1)
+        # write to disk: we just use a directory and spark will handle the filenames inside automatically
+        tmp_df.write.mode("append").parquet(temp_parquet_dir)
+
+        # clear
+        df_batch = []
+        # We are dealing with large in-memory data, so give the garbage collector
+        # a little kick between each batch. Alternatively could also use `del`.
+        gc.collect()
+        print(f"Batch {batch_number} written ({grb_count} messages processed so far)")
+
+# final partial batch
+batch_number += 1
+print(f"Processing batch {batch_number}: {len(df_batch)} messages")
+concat_df = pd.concat(df_batch, ignore_index=True)
+# pandas to spark
+tmp_df = spark.createDataFrame(concat_df, schema=schema)
+# reduce partitioning (because each partition will turn into a file)
+tmp_df = tmp_df.coalesce(1)
+# write to disk: we just use a directory and spark will handle the filenames inside automatically
+tmp_df.write.mode("append").parquet(temp_parquet_dir)
+
+print(f"Batch {batch_number} written ({grb_count} messages processed so far)")
+
+# Print summary
 files = dbutils.fs.ls(temp_parquet_dir)
 parquet_files = [f for f in files if f.name.endswith(".parquet")]
 total_size = sum(f.size for f in parquet_files)
@@ -104,6 +146,8 @@ grbs.close()
 
 # read all files from temp dir (spark read all files in dir)
 # doesnt actually load all data into memory
+# TODO: consider if this is necessary or if we should just proceed to next phase
+# with multiple files
 df = spark.read.parquet(temp_parquet_dir)
 print(f"Created final dataframe")
 
