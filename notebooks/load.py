@@ -112,6 +112,9 @@ try:
         table="dbo.pollen_forecast",
         mode="append",  # Append after truncate = replace
         properties=connection_properties,
+        numPartitions=8,  # parallel writes
+        batchsize=20000,  # larger batches per write than default
+        isolationLevel="READ_UNCOMMITTED",  # reduce locking, OK because we trucnate first
     )
     print(f"Successfully loaded data into SQL database")
 except Exception as e:
