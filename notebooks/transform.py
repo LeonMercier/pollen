@@ -93,11 +93,19 @@ for grb in grbs:
     # write to disk: we just use a directory and spark will handle the filenames inside automatically
     tmp_df.write.mode("append").parquet(temp_parquet_dir)
 
+files = dbutils.fs.ls(temp_parquet_dir)
+parquet_files = [f for f in files if f.name.endswith(".parquet")]
+total_size = sum(f.size for f in parquet_files)
+print(
+    f"Wrote {len(parquet_files)} parquet files, total: {total_size / (1024**2):.2f} MB, avg: {total_size / len(parquet_files) / 1024:.2f} KB per file"
+)
+
 grbs.close()
 
 # read all files from temp dir (spark read all files in dir)
+# doesnt actually load all data into memory
 df = spark.read.parquet(temp_parquet_dir)
-print(f"Created final dataframe with {df.count()} rows")
+print(f"Created final dataframe")
 
 # Write DataFrame to DBFS silver folder as parquet
 dbfs_silver_path = f"dbfs:/mnt/pollen/silver/grib_data_{timestamp}.parquet"
