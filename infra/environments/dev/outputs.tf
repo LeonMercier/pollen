@@ -38,3 +38,8 @@ output "web_storage_account_key" {
   value     = module.pollen.web_storage_account_key
   sensitive = true
 }
+
+# App Service
+output "app_service_url" { value = module.pollen.app_service_url }
+output "app_service_name" { value = module.pollen.app_service_name }
+output "app_service_plan_name" { value = module.pollen.app_service_plan_name }

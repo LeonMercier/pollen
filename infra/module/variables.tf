@@ -60,3 +60,15 @@ variable "web_storage_suffix" {
   type        = string
   default     = ""
 }
+
+variable "app_service_sku_name" {
+  description = "SKU for the App Service Plan (e.g., F1 for Free, B1 for Basic, S1 for Standard)"
+  type        = string
+  default     = "F1"
+}
+
+variable "python_runtime_version" {
+  description = "Python runtime version for App Service"
+  type        = string
+  default     = "3.11"
+}

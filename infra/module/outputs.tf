@@ -103,3 +103,22 @@ output "web_storage_account_key" {
   value       = azurerm_storage_account.web.primary_access_key
   sensitive   = true
 }
+
+# ========================================
+# App Service Outputs
+# ========================================
+
+output "app_service_url" {
+  description = "URL to access the FastAPI application"
+  value       = "https://${azurerm_linux_web_app.api.default_hostname}"
+}
+
+output "app_service_name" {
+  description = "App Service name"
+  value       = azurerm_linux_web_app.api.name
+}
+
+output "app_service_plan_name" {
+  description = "App Service Plan name"
+  value       = azurerm_service_plan.api.name
+}
