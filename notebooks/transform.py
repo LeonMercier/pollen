@@ -54,7 +54,7 @@ schema = StructType(
 
 # Create directory for temp files
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-temp_parquet_dir = f"dbfs:/tmp/grib_temp_{timestamp}/"
+dbfs_silver_path = f"dbfs:/mnt/pollen/silver/grib_data_{timestamp}/"
 
 # Accumulate BATCH_SIZE GRIB messages into one pandas dataframe,
 # then turn into pySpark dataframe and write to disk.
@@ -117,7 +117,7 @@ for grb in grbs:
         tmp_df = tmp_df.repartition(8)
         # Write to disk: we just use a directory and spark will handle the
         # filenames inside automatically.
-        tmp_df.write.mode("append").parquet(temp_parquet_dir)
+        tmp_df.write.mode("append").parquet(dbfs_silver_path)
 
         # clear
         df_batch = []
@@ -132,11 +132,11 @@ print(f"Processing batch {batch_number}: {len(df_batch)} messages")
 concat_df = pd.concat(df_batch, ignore_index=True)
 tmp_df = spark.createDataFrame(concat_df, schema=schema)
 tmp_df = tmp_df.repartition(8)
-tmp_df.write.mode("append").parquet(temp_parquet_dir)
+tmp_df.write.mode("append").parquet(dbfs_silver_path)
 print(f"Batch {batch_number} written ({grb_count} messages processed so far)")
 
 # Print summary
-files = dbutils.fs.ls(temp_parquet_dir)
+files = dbutils.fs.ls(dbfs_silver_path)
 parquet_files = [f for f in files if f.name.endswith(".parquet")]
 total_size = sum(f.size for f in parquet_files)
 print(
@@ -145,23 +145,10 @@ print(
 
 grbs.close()
 
-# read all files from temp dir (spark read all files in dir)
-# doesnt actually load all data into memory
-# TODO: consider if this is necessary or if we should just proceed to next phase
-# with multiple files
-df = spark.read.parquet(temp_parquet_dir)
-print(f"Created final dataframe")
-
-# Write DataFrame to DBFS silver folder as parquet
-dbfs_silver_path = f"dbfs:/mnt/pollen/silver/grib_data_{timestamp}.parquet"
-df.write.mode("overwrite").parquet(dbfs_silver_path)
-
-print(f"Written to {dbfs_silver_path}")
 
 # cleanup
 if os.path.exists(local_path):
     os.remove(local_path)
-dbutils.fs.rm(temp_parquet_dir, recurse=True)
 
 # think of as a return value
 result = dbfs_silver_path

@@ -70,7 +70,7 @@ except Exception as e:
     print(f"ERROR creating table: {str(e)}")
     raise
 
-# read parquet file from transform step
+# read all parquet files from transform step
 # raise = exception becomes fatal
 # creates spark dataframe, not exactly same as pandas dataframe
 try:
