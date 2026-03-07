@@ -294,7 +294,7 @@ resource "databricks_workspace_file" "init_script" {
 
 # Upload extract notebook
 resource "databricks_notebook" "extract" {
-  source = "${path.module}/../notebooks/extract.py"
+  source = "${path.module}/../../notebooks/extract.py"
   path   = "/Workspace/notebooks/extract"
 
   # Ensure workspace and permissions are ready
@@ -306,7 +306,7 @@ resource "databricks_notebook" "extract" {
 
 # Upload transform notebook
 resource "databricks_notebook" "transform" {
-  source = "${path.module}/../notebooks/transform.py"
+  source = "${path.module}/../../notebooks/transform.py"
   path   = "/Workspace/notebooks/transform"
 
   depends_on = [
@@ -317,7 +317,7 @@ resource "databricks_notebook" "transform" {
 
 # Upload load notebook
 resource "databricks_notebook" "load" {
-  source = "${path.module}/../notebooks/load.py"
+  source = "${path.module}/../../notebooks/load.py"
   path   = "/Workspace/notebooks/load"
 
   depends_on = [
@@ -328,7 +328,7 @@ resource "databricks_notebook" "load" {
 
 # Upload plot notebook
 resource "databricks_notebook" "plot" {
-  source = "${path.module}/../notebooks/plot.py"
+  source = "${path.module}/../../notebooks/plot.py"
   path   = "/Workspace/notebooks/plot"
 
   depends_on = [
