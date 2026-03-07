@@ -382,6 +382,12 @@ resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
     init_scripts = [databricks_workspace_file.init_script.path]
   }
 
+  # Ignore drift in max_numer_of_workers. This is a cosmetic fix that's needed
+  # when min and max workers are the same value.
+  lifecycle {
+    ignore_changes = [new_cluster_config[0].max_number_of_workers]
+  }
+
   adb_domain       = "https://${azurerm_databricks_workspace.dbw.workspace_url}"
   msi_workspace_id = azurerm_databricks_workspace.dbw.id
 
