@@ -103,18 +103,19 @@ except Exception as e:
     print(f"ERROR truncating table: {str(e)}")
     raise
 
-# write to database
-# dataframe keys have to match SQL table colum names
-# TODO: change options of write to parallelize better
+# Write to database
+# Dataframe keys have to match SQL table colum names
+# Number of DB connections depends on number of partitions, so reduce to
+# a reasonable number.
+df = df.repartition(8)
 try:
-    df.write.jdbc(
+    df.write.option("batchsize", 20000).option(
+        "isolationLevel", "READ_UNCOMMITTED"
+    ).jdbc(
         url=jdbc_url,
         table="dbo.pollen_forecast",
-        mode="append",  # Append after truncate = replace
+        mode="append",
         properties=connection_properties,
-        numPartitions=8,  # parallel writes
-        batchsize=20000,  # larger batches per write than default
-        isolationLevel="READ_UNCOMMITTED",  # reduce locking, OK because we trucnate first
     )
     print(f"Successfully loaded data into SQL database")
 except Exception as e:

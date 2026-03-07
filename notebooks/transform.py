@@ -61,7 +61,9 @@ temp_parquet_dir = f"dbfs:/tmp/grib_temp_{timestamp}/"
 # The goal is to prevent loading the whole dataset into memory as one giant
 # pandas dataframe. Simultaneously we want to avoid the overhead from too many
 # Spark jobs, hence the batching.
-BATCH_SIZE = 100
+
+# Counterintuitively, OOM is more likely in multi-node configs than single-node.
+BATCH_SIZE = 50
 df_batch = []
 grb_count = 0
 batch_number = 0
@@ -109,9 +111,12 @@ for grb in grbs:
         concat_df = pd.concat(df_batch, ignore_index=True)
         # pandas to spark
         tmp_df = spark.createDataFrame(concat_df, schema=schema)
-        # reduce partitioning (because each partition will turn into a file)
-        tmp_df = tmp_df.coalesce(1)
-        # write to disk: we just use a directory and spark will handle the filenames inside automatically
+        # Spark by default creates 200 partitions, which would be fine, except
+        # that here we are already creating many small dataframes in a loop.
+        # Therefore we reduce partitioning.
+        tmp_df = tmp_df.repartition(8)
+        # Write to disk: we just use a directory and spark will handle the
+        # filenames inside automatically.
         tmp_df.write.mode("append").parquet(temp_parquet_dir)
 
         # clear
@@ -121,17 +126,13 @@ for grb in grbs:
         gc.collect()
         print(f"Batch {batch_number} written ({grb_count} messages processed so far)")
 
-# final partial batch
+# final partial batch (same as above)
 batch_number += 1
 print(f"Processing batch {batch_number}: {len(df_batch)} messages")
 concat_df = pd.concat(df_batch, ignore_index=True)
-# pandas to spark
 tmp_df = spark.createDataFrame(concat_df, schema=schema)
-# reduce partitioning (because each partition will turn into a file)
-tmp_df = tmp_df.coalesce(1)
-# write to disk: we just use a directory and spark will handle the filenames inside automatically
+tmp_df = tmp_df.repartition(8)
 tmp_df.write.mode("append").parquet(temp_parquet_dir)
-
 print(f"Batch {batch_number} written ({grb_count} messages processed so far)")
 
 # Print summary
