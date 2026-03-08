@@ -12,55 +12,49 @@ if not input_path:
     input_path = dbutils.fs.ls("dbfs:/mnt/pollen/silver/")[-1].path
     print(f"No input_path provided, using latest file: {input_path}")
 
-# get secrets for SQL access
-sql_server = dbutils.secrets.get(scope="secrets", key="sql-server-fqdn")
-sql_username = dbutils.secrets.get(scope="secrets", key="sql-admin-username")
-sql_password = dbutils.secrets.get(scope="secrets", key="sql-admin-password")
-sql_database = "sqldb-pollen"  # name is configured in the Terraform resource
+# get secrets for PostgreSQL access
+postgres_server = dbutils.secrets.get(scope="secrets", key="postgres-server-fqdn")
+postgres_username = dbutils.secrets.get(scope="secrets", key="postgres-admin-username")
+postgres_password = dbutils.secrets.get(scope="secrets", key="postgres-admin-password")
+postgres_database = "pollen"  # name is configured in the Terraform resource
 
-# connect to SQL
-jdbc_url = f"jdbc:sqlserver://{sql_server}:1433;database={sql_database};encrypt=true;trustServerCertificate=false;loginTimeout=30"
+# connect to PostgreSQL
+jdbc_url = (
+    f"jdbc:postgresql://{postgres_server}:5432/{postgres_database}?sslmode=require"
+)
 connection_properties = {
-    "user": sql_username,
-    "password": sql_password,
-    "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+    "user": postgres_username,
+    "password": postgres_password,
+    "driver": "org.postgresql.Driver",
 }
 
 # create the table if it doesnt already exist
-# triple quote = multiline string (+ no need to escape single quotes)
-# IDENTITY() = auto increment (start, increment)
-# TODO: review decimal scale/precision to match data
+# TODO: review DECIMAL and DOUBLE needed precision
 create_table_sql = """
-IF OBJECT_ID('dbo.pollen_forecast', 'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.pollen_forecast (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        start_date DATETIME2 NOT NULL,
-        load_timestamp DATETIME2 NOT NULL DEFAULT GETDATE(),
-        constituent_type NVARCHAR(50) NOT NULL,
-        latitude DECIMAL(9,6) NOT NULL,
-        longitude DECIMAL(9,6) NOT NULL,
-        constituent_value FLOAT NOT NULL,
-        forecast_time INT NOT NULL
-    );
-    
-    CREATE INDEX idx_forecast_time ON dbo.pollen_forecast(forecast_timestamp DESC);
-    CREATE INDEX idx_constituent ON dbo.pollen_forecast(constituent_type);
-    CREATE INDEX idx_location ON dbo.pollen_forecast(latitude, longitude);
-    
-    PRINT 'Table created successfully';
-END
-ELSE
-BEGIN
-    PRINT 'Table already exists';
-END
+CREATE TABLE IF NOT EXISTS public.pollen_forecast (
+    id SERIAL PRIMARY KEY,
+    start_date TIMESTAMP NOT NULL,
+    load_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    constituent_type VARCHAR(50) NOT NULL,
+    latitude DECIMAL(9,6) NOT NULL,
+    longitude DECIMAL(9,6) NOT NULL,
+    constituent_value DOUBLE PRECISION NOT NULL,
+    forecast_time INT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_forecast_time 
+    ON public.pollen_forecast(forecast_time DESC);
+CREATE INDEX IF NOT EXISTS idx_constituent 
+    ON public.pollen_forecast(constituent_type);
+CREATE INDEX IF NOT EXISTS idx_location 
+    ON public.pollen_forecast(latitude, longitude);
 """
 
 # execute database creation
 # The 'spark' object exists already because of the Databricks environment.
 try:
     connection = spark._jvm.java.sql.DriverManager.getConnection(
-        jdbc_url, sql_username, sql_password
+        jdbc_url, postgres_username, postgres_password
     )
     statement = connection.createStatement()
     statement.execute(create_table_sql)
@@ -89,11 +83,10 @@ df.printSchema()
 
 # truncate = remove all rows, but keep table structure
 # never gets here if parquet loading fails
-# TODO: createentirely new table and swap once done
-truncate_sql = "TRUNCATE TABLE dbo.pollen_forecast"
+truncate_sql = "TRUNCATE TABLE public.pollen_forecast"
 try:
     connection = spark._jvm.java.sql.DriverManager.getConnection(
-        jdbc_url, sql_username, sql_password
+        jdbc_url, postgres_username, postgres_password
     )
     statement = connection.createStatement()
     statement.execute(truncate_sql)
@@ -113,11 +106,11 @@ try:
         "isolationLevel", "READ_UNCOMMITTED"
     ).jdbc(
         url=jdbc_url,
-        table="dbo.pollen_forecast",
+        table="public.pollen_forecast",
         mode="append",
         properties=connection_properties,
     )
-    print(f"Successfully loaded data into SQL database")
+    print(f"Successfully loaded data into PostgreSQL database")
 except Exception as e:
-    print(f"ERROR loading data to SQL: {str(e)}")
+    print(f"ERROR loading data to PostgreSQL: {str(e)}")
     raise

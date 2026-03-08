@@ -4,12 +4,12 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import expr
 from azure.storage.blob import BlobServiceClient, ContentSettings
 
-# NOTE: we could have skipped the whole SQL step and use just dataframes and
+# NOTE: we could have skipped the whole PostgreSQL step and use just dataframes and
 # possibly parquet. But there will be other users of the data in the future
-# and so using SQL makes sense
+# and so using PostgreSQL makes sense
 
 
-def plot(latitude, longitude, name, sqlconn):
+def plot(latitude, longitude, name, pg_conn):
     # using f-strings to create SQL queries opens the door to SQL injection
     # here we enforce the types to prevent that
     lat = float(latitude)
@@ -19,11 +19,11 @@ def plot(latitude, longitude, name, sqlconn):
     # further wrap with another query
     query = f"""
         (SELECT start_date, forecast_time, constituent_type, constituent_value
-        FROM dbo.pollen_forecast
+        FROM public.pollen_forecast
         WHERE latitude = {lat} AND longitude = {lon}) AS filtered_data
         """
     try:
-        df = spark.read.jdbc(jdbc_url, query, properties=sqlconn)
+        df = spark.read.jdbc(jdbc_url, query, properties=pg_conn)
     except Exception as e:
         print(f"WARNING: Could not read from database: {str(e)}")
         raise
@@ -32,7 +32,7 @@ def plot(latitude, longitude, name, sqlconn):
     # this is to get a nice x-axis with actual datetimes instead of just hours since
     # start of forecast
     df = df.withColumn(
-        "forecast_datetime", expr("DATEADD(hour, forecast_time, start_date)")
+        "forecast_datetime", expr("start_date + INTERVAL '1 hour' * forecast_time")
     )
 
     # pyspark specific way to visualize interactively
@@ -59,18 +59,18 @@ def plot(latitude, longitude, name, sqlconn):
     return fig.to_html(full_html=False, include_plotlyjs="cdn")
 
 
-# get secrets for SQL access
-sql_server = dbutils.secrets.get(scope="secrets", key="sql-server-fqdn")
-sql_username = dbutils.secrets.get(scope="secrets", key="sql-admin-username")
-sql_password = dbutils.secrets.get(scope="secrets", key="sql-admin-password")
-sql_database = "sqldb-pollen"  # name is configured in the Terraform resource
+# get secrets for PostgreSQL access
+postgres_server = dbutils.secrets.get(scope="secrets", key="postgres-server-fqdn")
+postgres_username = dbutils.secrets.get(scope="secrets", key="postgres-admin-username")
+postgres_password = dbutils.secrets.get(scope="secrets", key="postgres-admin-password")
+postgres_database = "pollen"  # name is configured in the Terraform resource
 
-# connect to SQL
-jdbc_url = f"jdbc:sqlserver://{sql_server}:1433;database={sql_database};encrypt=true;trustServerCertificate=false;loginTimeout=30"
+# connect to PostgreSQL
+jdbc_url = f"jdbc:postgresql://{postgres_server}:5432/{postgres_database}?sslmode=require"
 connection_properties = {
-    "user": sql_username,
-    "password": sql_password,
-    "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+    "user": postgres_username,
+    "password": postgres_password,
+    "driver": "org.postgresql.Driver",
 }
 
 # locations we want to plot
