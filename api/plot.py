@@ -18,7 +18,8 @@ def plot(latitude, longitude):
     # create new column forecast_datetime that is a sum of start_date and forecast_time
     df["forecast_datetime"] = df["start_date"] + df["forecast_time"]
 
-    # TODO: order df by forecast_datetime
+    # order df by forecast_datetime
+    df = df.sort_values("foreacast_datetime")
 
     fig = px.line(
         df,
