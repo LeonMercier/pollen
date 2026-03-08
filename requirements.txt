@@ -1,4 +1,5 @@
 # Python dependencies for the Pollen ETL project
+# NOTE: another req file in ./api
 
 # For notebooks
 # These are also installed on Databricks clusters via init script
@@ -10,9 +11,5 @@ azure-storage-blob
 # For notebooks type hints locally
 pyspark~=3.5.0
 databricks-sdk~=0.9.0
-
-# For API
-plotly~=6.6.0
-psycopg[binary]~=3.3.0
 
 

@@ -8,6 +8,9 @@ Currently provides a single route returning an HTML welcome page.
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
+# local modules
+from plot import plot
+
 app = FastAPI(
     title="Pollen ETL API",
     description="API for Pollen ETL data pipeline",
@@ -20,7 +23,7 @@ async def root():
     """
     Root endpoint returning a simple HTML page.
     """
-    html_content = """
+    html_start = """
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -57,9 +60,17 @@ async def root():
             <h1>Pollen ETL API</h1>
             <p>Welcome to the Pollen ETL data pipeline API</p>
         </div>
+    """
+
+    fig = plot(60.15, 24.95)
+
+    html_end = """
     </body>
     </html>
     """
+
+    html_content = html_start + fig + html_end
+
     return html_content
 
 

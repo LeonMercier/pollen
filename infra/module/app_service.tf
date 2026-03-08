@@ -53,11 +53,11 @@ resource "azurerm_linux_web_app" "api" {
 
     # Database connection settings (from Key Vault)
     # Note: Key Vault references require the App Service managed identity to have access
-    "DATABASE_HOST"     = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.postgres_fqdn.id})"
+    "DATABASE_HOST"     = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.postgres_fqdn.versionless_id})"
     "DATABASE_PORT"     = "5432"
     "DATABASE_NAME"     = azurerm_postgresql_flexible_server_database.pollen.name
-    "DATABASE_USER"     = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.postgres_username.id})"
-    "DATABASE_PASSWORD" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.postgres_password.id})"
+    "DATABASE_USER"     = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.postgres_username.versionless_id})"
+    "DATABASE_PASSWORD" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.postgres_password.versionless_id})"
     "DATABASE_SSLMODE"  = var.database_sslmode
   }
 
@@ -68,11 +68,11 @@ resource "azurerm_linux_web_app" "api" {
   tags = azurerm_resource_group.rg.tags
 
   # Lifecycle rule
-  lifecycle {
-    ignore_changes = [
-      zip_deploy_file # Ignore changes to deployment package hash
-    ]
-  }
+  # lifecycle {
+  #   ignore_changes = [
+  #     zip_deploy_file # Ignore changes to deployment package hash
+  #   ]
+  # }
 
   # Ensure Key Vault secrets and access policy are created before App Service app_settings reference them
   depends_on = [
@@ -85,8 +85,6 @@ resource "azurerm_linux_web_app" "api" {
 # 11.2.1: Key Vault access policy for App Service managed identity
 # This allows the App Service to read database credentials from Key Vault
 resource "azurerm_key_vault_access_policy" "app_service" {
-  count = try(azurerm_linux_web_app.api.identity[0].principal_id, null) != null ? 1 : 0
-
   key_vault_id = azurerm_key_vault.kv.id
   tenant_id    = try(azurerm_linux_web_app.api.identity[0].tenant_id, data.azurerm_client_config.current.tenant_id)
   object_id    = try(azurerm_linux_web_app.api.identity[0].principal_id, "")

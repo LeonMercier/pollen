@@ -1,16 +1,23 @@
 import plotly.express as px
 import pandas as pd
-import psycopg
+
+# local
+from database import *
 
 
 def plot(latitude, longitude):
+    # SQL injection guard
+    lat = float(latitude)
+    lon = float(longitude)
+
     query = f"""
         (SELECT start_date, forecast_time, constituent_type, constituent_value
-        FROM dbo.pollen_forecast
-        WHERE latitude = {latitude} AND longitude = {longitude})
+        FROM public.pollen_forecast
+        WHERE latitude = {lat} AND longitude = {lon})
         """
     try:
-        df = {}  # TODO: execute SQL query
+        conn = get_sync_connection()
+        df = pd.read_sql_query(query, conn)
     except Exception as e:
         print(f"WARNING: Could not read from database: {str(e)}")
         raise
@@ -19,7 +26,7 @@ def plot(latitude, longitude):
     df["forecast_datetime"] = df["start_date"] + df["forecast_time"]
 
     # order df by forecast_datetime
-    df = df.sort_values("foreacast_datetime")
+    df = df.sort_values("forecast_datetime")
 
     fig = px.line(
         df,

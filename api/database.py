@@ -40,19 +40,17 @@ def get_database_url() -> str:
     )
 
 
-# Example usage with psycopg2 (sync)
+# Example usage with psycopg (sync)
 def get_sync_connection():
     """
-    Example: Get a sync database connection using psycopg2.
-
-    Install: pip install psycopg2-binary
+    Example: Get a sync database connection using psycopg2
     """
     import psycopg
 
     conn = psycopg.connect(
         host=DATABASE_HOST,
         port=DATABASE_PORT,
-        database=DATABASE_NAME,
+        dbname=DATABASE_NAME,
         user=DATABASE_USER,
         password=DATABASE_PASSWORD,
         sslmode=DATABASE_SSLMODE,
