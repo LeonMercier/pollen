@@ -6,8 +6,8 @@ variable "app_name" {
   description = "Application name used in resource naming"
   type        = string
 }
-variable "sql_admin_username" {
-  description = "Azure SQL Server administrator username"
+variable "postgres_admin_username" {
+  description = "Azure PostgreSQL Flexible Server administrator username"
   type        = string
 }
 variable "cdsapi_url" {
@@ -20,11 +20,11 @@ variable "cdsapi_key" {
   sensitive   = true
 }
 variable "admin_email" {
-  description = "Email address for SQL database monitoring alerts"
+  description = "Email address for PostgreSQL database monitoring alerts"
   type        = string
 }
-variable "sql_sku_name" {
-  description = "SKU for the SQL server"
+variable "postgres_sku_name" {
+  description = "SKU for the PostgreSQL Flexible Server (e.g., B_Standard_B1ms, GP_Standard_D2s_v3)"
   type        = string
 }
 variable "databricks_node_type" {

@@ -18,8 +18,8 @@ variable "app_name" {
   type        = string
 }
 
-variable "sql_admin_username" {
-  description = "Azure SQL Server administrator username"
+variable "postgres_admin_username" {
+  description = "Azure PostgreSQL Flexible Server administrator username"
   type        = string
 }
 
@@ -36,12 +36,12 @@ variable "cdsapi_key" {
 }
 
 variable "admin_email" {
-  description = "Email address for SQL database monitoring alerts"
+  description = "Email address for PostgreSQL database monitoring alerts"
   type        = string
 }
 
-variable "sql_sku_name" {
-  description = "SKU for the SQL server"
+variable "postgres_sku_name" {
+  description = "SKU for the PostgreSQL Flexible Server (e.g., B_Standard_B1ms, GP_Standard_D2s_v3)"
   type        = string
 }
 

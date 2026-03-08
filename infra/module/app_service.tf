@@ -35,7 +35,7 @@ resource "azurerm_linux_web_app" "api" {
 
     # Health check endpoint (if we have a health check, then the eviction tim
     # is needed too.
-    health_check_path = "/health"
+    health_check_path                 = "/health"
     health_check_eviction_time_in_min = 2
   }
 

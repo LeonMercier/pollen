@@ -43,8 +43,8 @@ resource "random_string" "unique" {
   upper   = false
 }
 
-# Random password for SQL Server administrator
-resource "random_password" "sql_admin" {
+# Random password for PostgreSQL administrator
+resource "random_password" "postgres_admin" {
   length           = 24
   special          = true
   override_special = "!#$%&*()-_=+[]{}<>:?"
@@ -109,38 +109,38 @@ resource "azurerm_key_vault_access_policy" "adf" {
   depends_on = [azurerm_data_factory.adf]
 }
 
-# Store SQL admin password in Key Vault
-resource "azurerm_key_vault_secret" "sql_password" {
-  name         = "sql-admin-password"
-  value        = random_password.sql_admin.result
+# Store PostgreSQL admin password in Key Vault
+resource "azurerm_key_vault_secret" "postgres_password" {
+  name         = "postgres-admin-password"
+  value        = random_password.postgres_admin.result
   key_vault_id = azurerm_key_vault.kv.id
 
   depends_on = [azurerm_key_vault_access_policy.user]
 }
 
-# Store SQL Server FQDN in Databricks secret scope
-resource "databricks_secret" "sql_server_fqdn" {
+# Store PostgreSQL Server FQDN in Databricks secret scope
+resource "databricks_secret" "postgres_server_fqdn" {
   scope        = databricks_secret_scope.secrets.name
-  key          = "sql-server-fqdn"
-  string_value = azurerm_mssql_server.sql.fully_qualified_domain_name
+  key          = "postgres-server-fqdn"
+  string_value = azurerm_postgresql_flexible_server.postgres.fqdn
 
   depends_on = [databricks_secret_scope.secrets]
 }
 
-# Store SQL admin username in Databricks secret scope
-resource "databricks_secret" "sql_admin_username" {
+# Store PostgreSQL admin username in Databricks secret scope
+resource "databricks_secret" "postgres_admin_username" {
   scope        = databricks_secret_scope.secrets.name
-  key          = "sql-admin-username"
-  string_value = var.sql_admin_username
+  key          = "postgres-admin-username"
+  string_value = var.postgres_admin_username
 
   depends_on = [databricks_secret_scope.secrets]
 }
 
-# Store SQL admin password in Databricks secret scope
-resource "databricks_secret" "sql_admin_password" {
+# Store PostgreSQL admin password in Databricks secret scope
+resource "databricks_secret" "postgres_admin_password" {
   scope        = databricks_secret_scope.secrets.name
-  key          = "sql-admin-password"
-  string_value = random_password.sql_admin.result
+  key          = "postgres-admin-password"
+  string_value = random_password.postgres_admin.result
 
   depends_on = [databricks_secret_scope.secrets]
 }
@@ -164,51 +164,40 @@ resource "azurerm_key_vault_secret" "cdsapi_key" {
 }
 
 # ========================================
-# SECTION 6: Azure SQL Database
+# SECTION 6: Azure PostgreSQL Flexible Server
 # ========================================
 
-resource "azurerm_mssql_server" "sql" {
-  name                         = "sql-${var.app_name}-${random_string.unique.result}"
-  resource_group_name          = azurerm_resource_group.rg.name
-  location                     = azurerm_resource_group.rg.location
-  version                      = "12.0"
-  administrator_login          = var.sql_admin_username
-  administrator_login_password = random_password.sql_admin.result
+resource "azurerm_postgresql_flexible_server" "postgres" {
+  name                   = "psql-${var.app_name}-${random_string.unique.result}"
+  resource_group_name    = azurerm_resource_group.rg.name
+  location               = azurerm_resource_group.rg.location
+  administrator_login    = var.postgres_admin_username
+  administrator_password = random_password.postgres_admin.result
+
+  sku_name   = var.postgres_sku_name
+  version    = "16"
+  storage_mb = 32768 # 32 GB minimum
+
+  backup_retention_days        = 7
+  geo_redundant_backup_enabled = false
+
+  # Public access for Azure services
+  public_network_access_enabled = true
 
   tags = azurerm_resource_group.rg.tags
 }
 
-resource "azurerm_mssql_database" "sqldb" {
-  name      = "sqldb-${var.app_name}"
-  server_id = azurerm_mssql_server.sql.id
-
-  sku_name = var.sql_sku_name
-
-  # Free tier limits
-  max_size_gb = 32 # Free tier maximum
-
-  # Serverless configuration
-  auto_pause_delay_in_minutes = 15  # Auto-pause after 15 min idle 
-  min_capacity                = 0.5 # Minimum 0.5 vCores when active
-
-  # Storage redundancy (free tier requirement)
-  storage_account_type = "Local" # LRS only for free tier
-
-  # Backup retention (free tier limit)
-  short_term_retention_policy {
-    retention_days = 7 # Maximum for free tier
-  }
-
-  tags = azurerm_resource_group.rg.tags
+resource "azurerm_postgresql_flexible_server_database" "pollen" {
+  name      = "pollen"
+  server_id = azurerm_postgresql_flexible_server.postgres.id
+  charset   = "UTF8"
+  collation = "en_US.utf8"
 }
 
-# Allow Azure services to access SQL Server (required for Data Factory, Databricks)
-# A separate rule can be created to allow direct access from outside
-resource "azurerm_mssql_firewall_rule" "allow_azure" {
-  name      = "AllowAzureServices"
-  server_id = azurerm_mssql_server.sql.id
-  # 0.0.0.0 is a spacial value allowing everything isnide of Azure
-  # https://learn.microsoft.com/fi-fi/rest/api/sql/firewall-rules/create-or-update
+# Allow Azure services to access PostgreSQL Server (required for Data Factory, Databricks)
+resource "azurerm_postgresql_flexible_server_firewall_rule" "allow_azure" {
+  name             = "AllowAzureServices"
+  server_id        = azurerm_postgresql_flexible_server.postgres.id
   start_ip_address = "0.0.0.0"
   end_ip_address   = "0.0.0.0"
 }
@@ -388,8 +377,10 @@ resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
     ignore_changes = [new_cluster_config[0].max_number_of_workers]
   }
 
-  adb_domain       = "https://${azurerm_databricks_workspace.dbw.workspace_url}"
-  msi_workspace_id = azurerm_databricks_workspace.dbw.id
+  adb_domain = "https://${azurerm_databricks_workspace.dbw.workspace_url}"
+
+  # Use managed identity authentication
+  msi_work_space_resource_id = azurerm_databricks_workspace.dbw.id
 
   depends_on = [
     azurerm_role_assignment.adf_databricks, # Wait for permissions to be granted
@@ -397,21 +388,9 @@ resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
   ]
 }
 
-# 9.4: Linked Service - Azure SQL Database
-resource "azurerm_data_factory_linked_service_azure_sql_database" "sql" {
-  name            = "ls-sql"
-  data_factory_id = azurerm_data_factory.adf.id
-
-  connection_string = "Server=tcp:${azurerm_mssql_server.sql.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.sqldb.name};Encrypt=true;TrustServerCertificate=false;Connection Timeout=30;User ID=${var.sql_admin_username};"
-
-  # Use Key Vault for password
-  key_vault_password {
-    linked_service_name = azurerm_data_factory_linked_service_key_vault.kv.name
-    secret_name         = "sql-admin-password"
-  }
-}
-
-# 9.5: Pipeline - ETL Workflow
+# 9.4: Pipeline - ETL Workflow
+# Note: Notebooks connect directly to PostgreSQL via JDBC using Databricks secrets
+# No Data Factory linked service needed for database access
 resource "azurerm_data_factory_pipeline" "etl" {
   name            = "pipeline-pollen-etl"
   data_factory_id = azurerm_data_factory.adf.id
@@ -518,7 +497,6 @@ resource "azurerm_data_factory_pipeline" "etl" {
   depends_on = [
     azurerm_data_factory_linked_service_azure_databricks.dbw,
     azurerm_data_factory_linked_service_key_vault.kv,
-    azurerm_data_factory_linked_service_azure_sql_database.sql,
     databricks_notebook.extract,
     databricks_notebook.transform,
     databricks_notebook.load,

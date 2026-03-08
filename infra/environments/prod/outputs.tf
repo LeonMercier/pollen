@@ -12,17 +12,17 @@ output "databricks_workspace_id" { value = module.pollen.databricks_workspace_id
 output "key_vault_name" { value = module.pollen.key_vault_name }
 output "key_vault_uri" { value = module.pollen.key_vault_uri }
 
-# SQL Database
-output "sql_server_name" { value = module.pollen.sql_server_name }
-output "sql_server_fqdn" { value = module.pollen.sql_server_fqdn }
-output "sql_database_name" { value = module.pollen.sql_database_name }
-output "sql_admin_username" { value = module.pollen.sql_admin_username }
-output "sql_admin_password" {
-  value     = module.pollen.sql_admin_password
+# PostgreSQL Database
+output "postgres_server_name" { value = module.pollen.postgres_server_name }
+output "postgres_server_fqdn" { value = module.pollen.postgres_server_fqdn }
+output "postgres_database_name" { value = module.pollen.postgres_database_name }
+output "postgres_admin_username" { value = module.pollen.postgres_admin_username }
+output "postgres_admin_password" {
+  value     = module.pollen.postgres_admin_password
   sensitive = true
 }
-output "sql_connection_string" {
-  value     = module.pollen.sql_connection_string
+output "postgres_connection_string" {
+  value     = module.pollen.postgres_connection_string
   sensitive = true
 }
 

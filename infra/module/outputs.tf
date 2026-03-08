@@ -35,36 +35,36 @@ output "key_vault_uri" {
   value       = azurerm_key_vault.kv.vault_uri
 }
 
-# SQL Database
-output "sql_server_name" {
-  description = "SQL Server name"
-  value       = azurerm_mssql_server.sql.name
+# PostgreSQL Database
+output "postgres_server_name" {
+  description = "PostgreSQL Flexible Server name"
+  value       = azurerm_postgresql_flexible_server.postgres.name
 }
 
-output "sql_server_fqdn" {
-  description = "SQL Server fully qualified domain name (for connections)"
-  value       = azurerm_mssql_server.sql.fully_qualified_domain_name
+output "postgres_server_fqdn" {
+  description = "PostgreSQL Server fully qualified domain name (for connections)"
+  value       = azurerm_postgresql_flexible_server.postgres.fqdn
 }
 
-output "sql_database_name" {
-  description = "SQL Database name"
-  value       = azurerm_mssql_database.sqldb.name
+output "postgres_database_name" {
+  description = "PostgreSQL Database name"
+  value       = azurerm_postgresql_flexible_server_database.pollen.name
 }
 
-output "sql_admin_username" {
-  description = "SQL Server admin username"
-  value       = var.sql_admin_username
+output "postgres_admin_username" {
+  description = "PostgreSQL Server admin username"
+  value       = var.postgres_admin_username
 }
 
-output "sql_admin_password" {
-  description = "SQL Server admin password (sensitive - use: terraform output -raw sql_admin_password)"
-  value       = random_password.sql_admin.result
+output "postgres_admin_password" {
+  description = "PostgreSQL Server admin password (sensitive - use: terraform output -raw postgres_admin_password)"
+  value       = random_password.postgres_admin.result
   sensitive   = true
 }
 
-output "sql_connection_string" {
-  description = "SQL Server connection string (without password)"
-  value       = "Server=${azurerm_mssql_server.sql.fully_qualified_domain_name};Database=${azurerm_mssql_database.sqldb.name};User Id=${var.sql_admin_username};Encrypt=true;"
+output "postgres_connection_string" {
+  description = "PostgreSQL Server connection string (without password)"
+  value       = "Host=${azurerm_postgresql_flexible_server.postgres.fqdn};Port=5432;Database=${azurerm_postgresql_flexible_server_database.pollen.name};Username=${var.postgres_admin_username};Ssl Mode=Require;"
   sensitive   = true
 }
 

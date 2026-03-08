@@ -43,15 +43,15 @@ provider "random" {}
 module "pollen" {
   source = "../../module"
 
-  environment           = "prod"
-  location              = var.location
-  app_name              = var.app_name
-  sql_admin_username    = var.sql_admin_username
-  cdsapi_url            = var.cdsapi_url
-  cdsapi_key            = var.cdsapi_key
-  admin_email           = var.admin_email
-  sql_sku_name          = var.sql_sku_name
-  databricks_node_type  = var.databricks_node_type
-  adf_trigger_activated = var.adf_trigger_activated
-  web_storage_suffix    = "prod" # Stable URL for production website
+  environment             = "prod"
+  location                = var.location
+  app_name                = var.app_name
+  postgres_admin_username = var.postgres_admin_username
+  cdsapi_url              = var.cdsapi_url
+  cdsapi_key              = var.cdsapi_key
+  admin_email             = var.admin_email
+  postgres_sku_name       = var.postgres_sku_name
+  databricks_node_type    = var.databricks_node_type
+  adf_trigger_activated   = var.adf_trigger_activated
+  web_storage_suffix      = "prod" # Stable URL for production website
 }
