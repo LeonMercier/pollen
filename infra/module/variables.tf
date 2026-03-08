@@ -72,3 +72,13 @@ variable "python_runtime_version" {
   type        = string
   default     = "3.11"
 }
+
+variable "database_sslmode" {
+  description = "PostgreSQL SSL mode for App Service connections (disable, allow, prefer, require, verify-ca, verify-full)"
+  type        = string
+  default     = "require"
+  validation {
+    condition     = contains(["disable", "allow", "prefer", "require", "verify-ca", "verify-full"], var.database_sslmode)
+    error_message = "database_sslmode must be one of: disable, allow, prefer, require, verify-ca, verify-full"
+  }
+}

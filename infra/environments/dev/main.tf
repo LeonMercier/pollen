@@ -53,4 +53,5 @@ module "pollen" {
   postgres_sku_name       = var.postgres_sku_name
   databricks_node_type    = var.databricks_node_type
   adf_trigger_activated   = var.adf_trigger_activated
+  database_sslmode        = var.database_sslmode
 }

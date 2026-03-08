@@ -122,3 +122,8 @@ output "app_service_plan_name" {
   description = "App Service Plan name"
   value       = azurerm_service_plan.api.name
 }
+
+output "app_service_principal_id" {
+  description = "App Service Managed Identity principal ID"
+  value       = azurerm_linux_web_app.api.identity[0].principal_id
+}

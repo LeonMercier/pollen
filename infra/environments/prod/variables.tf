@@ -35,3 +35,9 @@ variable "adf_trigger_activated" {
   description = "Should the Data Factory pipeline start as activated"
   type        = bool
 }
+
+variable "database_sslmode" {
+  description = "PostgreSQL SSL mode for App Service connections"
+  type        = string
+  default     = "require"
+}

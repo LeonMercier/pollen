@@ -118,6 +118,24 @@ resource "azurerm_key_vault_secret" "postgres_password" {
   depends_on = [azurerm_key_vault_access_policy.user]
 }
 
+# Store PostgreSQL server FQDN in Key Vault
+resource "azurerm_key_vault_secret" "postgres_fqdn" {
+  name         = "postgres-server-fqdn"
+  value        = azurerm_postgresql_flexible_server.postgres.fqdn
+  key_vault_id = azurerm_key_vault.kv.id
+
+  depends_on = [azurerm_key_vault_access_policy.user]
+}
+
+# Store PostgreSQL admin username in Key Vault
+resource "azurerm_key_vault_secret" "postgres_username" {
+  name         = "postgres-admin-username"
+  value        = var.postgres_admin_username
+  key_vault_id = azurerm_key_vault.kv.id
+
+  depends_on = [azurerm_key_vault_access_policy.user]
+}
+
 # Store PostgreSQL Server FQDN in Databricks secret scope
 resource "databricks_secret" "postgres_server_fqdn" {
   scope        = databricks_secret_scope.secrets.name
@@ -173,6 +191,7 @@ resource "azurerm_postgresql_flexible_server" "postgres" {
   location               = azurerm_resource_group.rg.location
   administrator_login    = var.postgres_admin_username
   administrator_password = random_password.postgres_admin.result
+  # zone = "2" # if we want to pin the zone, the comment out the lifecycle block below
 
   sku_name   = var.postgres_sku_name
   version    = "16"
@@ -185,6 +204,11 @@ resource "azurerm_postgresql_flexible_server" "postgres" {
   public_network_access_enabled = true
 
   tags = azurerm_resource_group.rg.tags
+
+  # do not create warnings when when Azure automatically assigns zone 
+  lifecycle {
+    ignore_changes = [zone]
+  }
 }
 
 resource "azurerm_postgresql_flexible_server_database" "pollen" {
@@ -380,7 +404,7 @@ resource "azurerm_data_factory_linked_service_azure_databricks" "dbw" {
   adb_domain = "https://${azurerm_databricks_workspace.dbw.workspace_url}"
 
   # Use managed identity authentication
-  msi_work_space_resource_id = azurerm_databricks_workspace.dbw.id
+  msi_workspace_id = azurerm_databricks_workspace.dbw.id
 
   depends_on = [
     azurerm_role_assignment.adf_databricks, # Wait for permissions to be granted
