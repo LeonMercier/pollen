@@ -82,3 +82,9 @@ variable "database_sslmode" {
     error_message = "database_sslmode must be one of: disable, allow, prefer, require, verify-ca, verify-full"
   }
 }
+
+variable "enable_app_service" {
+  description = "Whether to deploy the App Service and App Service Plan for the FastAPI backend"
+  type        = bool
+  default     = true
+}

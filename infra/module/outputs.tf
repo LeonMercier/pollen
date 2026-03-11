@@ -110,20 +110,20 @@ output "web_storage_account_key" {
 
 output "app_service_url" {
   description = "URL to access the FastAPI application"
-  value       = "https://${azurerm_linux_web_app.api.default_hostname}"
+  value       = try("https://${azurerm_linux_web_app.api[0].default_hostname}", "")
 }
 
 output "app_service_name" {
   description = "App Service name"
-  value       = azurerm_linux_web_app.api.name
+  value       = try(azurerm_linux_web_app.api[0].name, "")
 }
 
 output "app_service_plan_name" {
   description = "App Service Plan name"
-  value       = azurerm_service_plan.api.name
+  value       = try(azurerm_service_plan.api[0].name, "")
 }
 
 output "app_service_principal_id" {
   description = "App Service Managed Identity principal ID"
-  value       = azurerm_linux_web_app.api.identity[0].principal_id
+  value       = try(azurerm_linux_web_app.api[0].identity[0].principal_id, "")
 }

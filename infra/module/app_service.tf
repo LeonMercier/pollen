@@ -4,6 +4,8 @@
 
 # 11.1: App Service Plan (Linux, Free F1 tier)
 resource "azurerm_service_plan" "api" {
+  count = var.enable_app_service ? 1 : 0
+
   name                = "asp-${var.app_name}-${var.environment}-${substr(var.location, 0, 2)}"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
@@ -15,10 +17,12 @@ resource "azurerm_service_plan" "api" {
 
 # 11.2: Linux Web App for FastAPI
 resource "azurerm_linux_web_app" "api" {
+  count = var.enable_app_service ? 1 : 0
+
   name                = "app-${var.app_name}-api-${var.environment}-${random_string.unique.result}"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
-  service_plan_id     = azurerm_service_plan.api.id
+  service_plan_id     = azurerm_service_plan.api[0].id
 
   # Enable system-assigned managed identity for Key Vault access
   identity {
@@ -85,9 +89,11 @@ resource "azurerm_linux_web_app" "api" {
 # 11.2.1: Key Vault access policy for App Service managed identity
 # This allows the App Service to read database credentials from Key Vault
 resource "azurerm_key_vault_access_policy" "app_service" {
+  count = var.enable_app_service ? 1 : 0
+
   key_vault_id = azurerm_key_vault.kv.id
-  tenant_id    = try(azurerm_linux_web_app.api.identity[0].tenant_id, data.azurerm_client_config.current.tenant_id)
-  object_id    = try(azurerm_linux_web_app.api.identity[0].principal_id, "")
+  tenant_id    = try(azurerm_linux_web_app.api[0].identity[0].tenant_id, data.azurerm_client_config.current.tenant_id)
+  object_id    = try(azurerm_linux_web_app.api[0].identity[0].principal_id, "")
 
   secret_permissions = [
     "Get"
@@ -102,6 +108,8 @@ resource "azurerm_key_vault_access_policy" "app_service" {
 # 11.3: Archive API code for deployment
 # This packages the ./api directory into a zip file
 data "archive_file" "api_code" {
+  count = var.enable_app_service ? 1 : 0
+
   type        = "zip"
   source_dir  = "${path.module}/../../api"
   output_path = "${path.module}/.terraform/api-deploy.zip"
