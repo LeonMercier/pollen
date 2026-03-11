@@ -1,6 +1,10 @@
 -- Schema initialization for local PostgreSQL
 -- This file is automatically run when the container first starts
 -- Needs to stay in sync with the schema defined in notebooks/load.py
+--
+-- NOTE: For local development, indexes are created immediately since the database
+-- starts empty. In the production ETL pipeline (notebooks/load.py), indexes are
+-- dropped before bulk loading and recreated afterward for optimal performance.
 
 CREATE TABLE IF NOT EXISTS public.pollen_forecast (
     id SERIAL PRIMARY KEY,

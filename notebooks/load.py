@@ -28,7 +28,8 @@ connection_properties = {
     "driver": "org.postgresql.Driver",
 }
 
-# create the table if it doesnt already exist
+# create the table if it doesnt already exist (without indexes initially)
+# Indexes are created AFTER data load for optimal performance
 # TODO: review DECIMAL and DOUBLE needed precision
 create_table_sql = """
 CREATE TABLE IF NOT EXISTS public.pollen_forecast (
@@ -41,7 +42,10 @@ CREATE TABLE IF NOT EXISTS public.pollen_forecast (
     constituent_value DOUBLE PRECISION NOT NULL,
     forecast_time INT NOT NULL
 );
+"""
 
+# Separate index creation (executed AFTER data load)
+create_indexes_sql = """
 CREATE INDEX IF NOT EXISTS idx_forecast_time 
     ON public.pollen_forecast(forecast_time DESC);
 CREATE INDEX IF NOT EXISTS idx_constituent 
@@ -84,25 +88,37 @@ df.printSchema()
 # truncate = remove all rows, but keep table structure
 # never gets here if parquet loading fails
 truncate_sql = "TRUNCATE TABLE public.pollen_forecast"
+# Drop indexes before load for optimal bulk insert performance
+drop_indexes_sql = """
+DROP INDEX IF EXISTS idx_forecast_time;
+DROP INDEX IF EXISTS idx_constituent;
+DROP INDEX IF EXISTS idx_location;
+"""
+
 try:
     connection = spark._jvm.java.sql.DriverManager.getConnection(
         jdbc_url, postgres_username, postgres_password
     )
     statement = connection.createStatement()
     statement.execute(truncate_sql)
+    statement.execute(drop_indexes_sql)
     connection.close()
-    print("Existing data truncated")
+    print("Existing data truncated and indexes dropped for fast loading")
 except Exception as e:
-    print(f"ERROR truncating table: {str(e)}")
+    print(f"ERROR truncating table and dropping indexes: {str(e)}")
     raise
 
 # Write to database
 # Dataframe keys have to match SQL table colum names
-# Number of DB connections depends on number of partitions, so reduce to
-# a reasonable number.
-df = df.repartition(8)
+# Calculate optimal partition count based on data size
+# Use 2-6 partitions for better IOPS utilization on B1ms SKU
+current_partitions = df.rdd.getNumPartitions()
+partition_count = min(6, max(2, current_partitions))
+df = df.coalesce(partition_count)
+print(f"Using {partition_count} partitions for parallel loading")
+
 try:
-    df.write.option("batchsize", 20000).option(
+    df.write.option("batchsize", 50000).option(
         "isolationLevel", "READ_UNCOMMITTED"
     ).jdbc(
         url=jdbc_url,
@@ -113,4 +129,19 @@ try:
     print(f"Successfully loaded data into PostgreSQL database")
 except Exception as e:
     print(f"ERROR loading data to PostgreSQL: {str(e)}")
+    raise
+
+# Recreate indexes after data load for optimal query performance
+# This is faster than updating indexes during each insert
+print("Recreating indexes (this may take 5-15 minutes depending on data size)...")
+try:
+    connection = spark._jvm.java.sql.DriverManager.getConnection(
+        jdbc_url, postgres_username, postgres_password
+    )
+    statement = connection.createStatement()
+    statement.execute(create_indexes_sql)
+    connection.close()
+    print("Indexes successfully recreated")
+except Exception as e:
+    print(f"ERROR recreating indexes: {str(e)}")
     raise
