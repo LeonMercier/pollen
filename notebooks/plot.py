@@ -66,7 +66,10 @@ postgres_password = dbutils.secrets.get(scope="secrets", key="postgres-admin-pas
 postgres_database = "pollen"  # name is configured in the Terraform resource
 
 # connect to PostgreSQL
-jdbc_url = f"jdbc:postgresql://{postgres_server}:5432/{postgres_database}?sslmode=require"
+# parenthesis allows to break long lines
+jdbc_url = (
+    f"jdbc:postgresql://{postgres_server}:5432/{postgres_database}?sslmode=require"
+)
 connection_properties = {
     "user": postgres_username,
     "password": postgres_password,
@@ -77,8 +80,8 @@ connection_properties = {
 # available grid points are like x.05, x.15, x.25 ... x.95
 locations = [
     {"lat": 60.15, "lon": 24.95, "name": "Helsinki"},
-    {"lat": 48.85, "lon": 2.35, "name": "Paris"},
-    {"lat": 41.85, "lon": 12.55, "name": "Rome"},
+    {"lat": 60.25, "lon": 22.15, "name": "Turku"},
+    {"lat": 61.25, "lon": 23.45, "name": "Tampere"},
 ]
 
 # create plots and save into an list
