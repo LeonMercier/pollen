@@ -64,7 +64,7 @@ echo "   Filtering: latitude=$LATITUDE, longitude=$LONGITUDE"
 
 # Extract data from Azure using psql with COPY TO STDOUT
 # This gets all columns for the specified coordinates
-PGPASSWORD="$AZURE_DB_PASSWORD" psql \
+PGSSLMODE=require PGPASSWORD="$AZURE_DB_PASSWORD" psql \
     --host="$AZURE_DB_HOST" \
     --username="$AZURE_DB_USER" \
     --dbname=pollen \
