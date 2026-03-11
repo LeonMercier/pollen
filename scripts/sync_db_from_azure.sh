@@ -8,9 +8,11 @@ set -e
 # - docker-compose PostgreSQL container running
 # - .env.local file with AZURE_KEY_VAULT_NAME configured
 
-# Coordinates to filter (Helsinki)
-LATITUDE=60.15
-LONGITUDE=24.95
+# Coordinate boundaries to filter data
+LAT_MIN=60.0
+LAT_MAX=62.0
+LON_MIN=22.0
+LON_MAX=26.0
 
 # Load environment variables from .env.local
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -60,16 +62,25 @@ if ! docker ps | grep -q pollen-postgres-local; then
 fi
 
 echo "Extracting data from Azure database: $AZURE_DB_HOST..."
-echo "   Filtering: latitude=$LATITUDE, longitude=$LONGITUDE"
+
+# Validate boundary parameters
+if [ -z "$LAT_MIN" ] || [ -z "$LAT_MAX" ] || [ -z "$LON_MIN" ] || [ -z "$LON_MAX" ]; then
+    echo "Error: All boundary parameters must be specified"
+    echo "  LAT_MIN, LAT_MAX, LON_MIN, LON_MAX"
+    echo "Please edit the script to set these values"
+    exit 1
+fi
+
+echo "   Filtering: latitude [$LAT_MIN, $LAT_MAX], longitude [$LON_MIN, $LON_MAX]"
 
 # Extract data from Azure using psql with COPY TO STDOUT
-# This gets all columns for the specified coordinates
+# Filters data within the specified bounding box
 PGSSLMODE=require PGPASSWORD="$AZURE_DB_PASSWORD" psql \
     --host="$AZURE_DB_HOST" \
     --username="$AZURE_DB_USER" \
     --dbname=pollen \
     --no-password \
-    -c "COPY (SELECT * FROM public.pollen_forecast WHERE latitude = $LATITUDE AND longitude = $LONGITUDE ORDER BY start_date, forecast_time) TO STDOUT WITH CSV HEADER" \
+    -c "COPY (SELECT * FROM public.pollen_forecast WHERE latitude BETWEEN $LAT_MIN AND $LAT_MAX AND longitude BETWEEN $LON_MIN AND $LON_MAX ORDER BY start_date, forecast_time) TO STDOUT WITH CSV HEADER" \
     > "$TEMP_FILE"
 
 if [ $? -ne 0 ]; then
@@ -82,7 +93,9 @@ ROW_COUNT=$(wc -l < "$TEMP_FILE")
 ROW_COUNT=$((ROW_COUNT - 1))  # Subtract header row
 
 if [ $ROW_COUNT -eq 0 ]; then
-    echo " No data found for coordinates: lat=$LATITUDE, lon=$LONGITUDE"
+    echo "Warning: No data found within specified boundaries"
+    echo "  Latitude: [$LAT_MIN, $LAT_MAX]"
+    echo "  Longitude: [$LON_MIN, $LON_MAX]"
     echo "The local database will be truncated but no new data will be added."
 fi
 
@@ -120,7 +133,7 @@ rm -f "$TEMP_FILE"
 
 echo ""
 echo "Database sync complete!"
-echo "Location: Helsinki (lat=$LATITUDE, lon=$LONGITUDE)"
+echo "Bounding box: latitude [$LAT_MIN, $LAT_MAX], longitude [$LON_MIN, $LON_MAX]"
 echo "Rows synced: $ROW_COUNT"
 echo ""
 echo "You can now run the API locally with: task local:api"
