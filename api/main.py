@@ -19,7 +19,10 @@ app = FastAPI(
 
 
 @app.get("/", response_class=HTMLResponse)
-async def root():
+# lat: param name
+# float | None: type hint
+# = None: default value
+async def root(lat: float | None = None, lon: float | None = None):
     """
     Root endpoint returning a simple HTML page.
     """
@@ -59,12 +62,21 @@ async def root():
         <div class="container">
             <h1>Pollen ETL API</h1>
             <p>Welcome to the Pollen ETL data pipeline API</p>
-        </div>
+            <a href="/?lat=60.15&lon=24.95">Helsinki</a>
+            <a href="/?lat=60.25&lon=22.15">Turku</a>
+            <a href="/?lat=61.25&lon=23.45">Tampere</a>
     """
 
-    fig = plot(60.15, 24.95)
+    if lat and lon:
+        try:
+            fig = plot(lat, lon)
+        except:
+            fig = "<p>Error happened</p>"
+    else:
+        fig = "<p>Press a button</p>"
 
     html_end = """
+    </div>
     </body>
     </html>
     """

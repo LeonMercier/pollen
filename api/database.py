@@ -1,11 +1,38 @@
 """
 Database connection configuration for PostgreSQL.
 
-Environment variables are automatically populated from Azure Key Vault
-via App Service managed identity.
+Supports two modes:
+- Production/Azure: Environment variables from Azure Key Vault via App Service
+- Local development: Environment variables from .env.local when ENV=local
 """
 
 import os
+from pathlib import Path
+
+
+def load_local_env():
+    """Load .env.local if ENV=local and file exists."""
+    if os.getenv("ENV") == "local":
+        env_file = Path(__file__).parent.parent / ".env.local"
+        if env_file.exists():
+            print(f"Loading local environment from {env_file}")
+            with open(env_file) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        if "=" in line:
+                            key, value = line.split("=", 1)
+                            os.environ.setdefault(key, value)
+        else:
+            print(
+                f"ENV=local but {env_file} not found. "
+                "Using system environment variables."
+            )
+
+
+# Load local env if applicable
+# Runs on module import and saves to module variables below
+load_local_env()
 
 # Database connection parameters from environment variables
 DATABASE_HOST = os.getenv("DATABASE_HOST")
@@ -33,6 +60,12 @@ def get_database_url() -> str:
             "and DATABASE_NAME are set."
         )
 
+    env_mode = os.getenv("ENV", "production")
+    print(
+        f"Connecting to PostgreSQL ({env_mode} mode): "
+        f"{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
+    )
+
     return (
         f"postgresql://{DATABASE_USER}:{DATABASE_PASSWORD}"
         f"@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
@@ -43,7 +76,7 @@ def get_database_url() -> str:
 # Example usage with psycopg (sync)
 def get_sync_connection():
     """
-    Example: Get a sync database connection using psycopg2
+    Get a sync database connection using psycopg.
     """
     import psycopg
 

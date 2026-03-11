@@ -63,7 +63,7 @@ resource "azurerm_linux_web_app" "api" {
 
   # ZIP deployment configuration
   # Terraform will package and deploy the ./api directory
-  zip_deploy_file = data.archive_file.api_code.output_path
+  # zip_deploy_file = data.archive_file.api_code.output_path
 
   tags = azurerm_resource_group.rg.tags
 

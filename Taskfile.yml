@@ -1,0 +1,163 @@
+version: "3"
+
+# Pollen ETL - Task Runner Configuration
+# Use 'task --list' to see all available tasks
+
+vars:
+  POSTGRES_CONTAINER: pollen-postgres-local
+  API_DIR: api
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  # ========================================
+  # Local Development - PostgreSQL
+  # ========================================
+
+  local:up:
+    desc: Start local PostgreSQL container
+    cmds:
+      - echo "Starting local PostgreSQL..."
+      - docker-compose up -d
+      - echo "Waiting for PostgreSQL to be healthy..."
+      - timeout 30 bash -c 'until docker exec {{.POSTGRES_CONTAINER}} pg_isready -U pollen_user; do sleep 1; done'
+      - echo "Local PostgreSQL is ready on localhost:5432!"
+      - echo 'Next steps:'
+      - echo 'Sync data from Azure, go-task local:sync'
+      - echo 'Run API locally, go-task local:api'
+
+  local:down:
+    desc: Stop local PostgreSQL container
+    cmds:
+      - echo "Stopping local PostgreSQL..."
+      - docker-compose down
+      - echo "Stopped (data persists in volume)"
+
+  local:logs:
+    desc: Show PostgreSQL container logs
+    cmds:
+      - docker-compose logs -f postgres
+
+  local:sync:
+    desc: Sync database from Azure dev environment
+    cmds:
+      - echo "Syncing database from Azure..."
+      - bash scripts/sync_db_from_azure.sh
+
+  local:shell:
+    desc: Open psql shell in local database
+    cmds:
+      - docker exec -it {{.POSTGRES_CONTAINER}} psql -U pollen_user -d pollen
+
+  local:reset:
+    desc: Reset local database (WARNING - deletes all data)
+    prompt: This will delete all local data. Continue?
+    cmds:
+      - echo "Resetting local database..."
+      - docker-compose down -v
+      - docker-compose up -d
+      - echo "Waiting for PostgreSQL to be healthy..."
+      - timeout 30 bash -c 'until docker exec {{.POSTGRES_CONTAINER}} pg_isready -U pollen_user; do sleep 1; done'
+      - echo "Database reset complete"
+      - echo "Run 'task local:sync' to restore data from Azure"
+
+  local:status:
+    desc: Check status of local services
+    cmds:
+      - echo "Checking local service status..."
+      - docker ps --filter "name={{.POSTGRES_CONTAINER}}"
+
+  # ========================================
+  # Local Development - FastAPI
+  # ========================================
+
+  local:api:
+    desc: Run FastAPI locally (connects to local PostgreSQL)
+    cmds:
+      - echo "Starting FastAPI on http://localhost:8000..."
+      - echo "Running in local mode (ENV=local)"
+      - echo "Auto-reload enabled - edit files to see changes"
+      - cd {{.API_DIR}} && ENV=local uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+  local:api:prod:
+    desc: Run FastAPI locally without reload (production-like)
+    cmds:
+      - echo "Starting FastAPI on http://localhost:8000 (production mode)..."
+      - cd {{.API_DIR}} && ENV=local uvicorn main:app --host 0.0.0.0 --port 8000
+
+  # ========================================
+  # Local Development - Combined Workflows
+  # ========================================
+
+  local:setup:
+    desc: First-time setup - start DB, sync data
+    cmds:
+      - task: local:up
+      - task: local:sync
+      - echo ""
+      - echo "Local environment is ready!"
+      - echo "Start the API with, task local:api"
+
+  local:clean:
+    desc: Stop containers and remove volumes (complete cleanup)
+    prompt: This will delete all containers and volumes. Continue?
+    cmds:
+      - echo "Cleaning up local environment..."
+      - docker-compose down -v
+      - echo "Cleanup complete"
+
+  # ========================================
+  # Deployment
+  # ========================================
+
+  remote:deployapi:dev:
+    desc: Deploy api code to Azure App Service (dev)
+    vars:
+      TF_DIR: infra/environments/dev
+      APP_NAME:
+        sh: cd {{.TF_DIR}} && terraform output -raw app_service_name
+      RG_NAME:
+        sh: cd {{.TF_DIR}} && terraform output -raw resource_group_name
+    cmds:
+      - cd ./api && zip -r ../api-deploy.zip .
+      - az webapp deploy --restart true --type zip --name {{.APP_NAME}} --resource-group {{.RG_NAME}} --src-path ./api-deploy.zip
+      - rm api-deploy.zip
+
+  remote:deployapi:prod:
+    desc: Deploy api code to Azure App Service (prod)
+    vars:
+      TF_DIR: infra/environments/prod
+      APP_NAME:
+        sh: cd {{.TF_DIR}} && terraform output -raw app_service_name
+      RG_NAME:
+        sh: cd {{.TF_DIR}} && terraform output -raw resource_group_name
+    cmds:
+      - zip -r api-deploy.zip ./api
+      - az webapp deployment source config-zip --name {{.APP_NAME}} --resource-group {{.RG_NAME}} --src ./api-deploy.zip
+      - rm api-deploy.zip
+
+  # ========================================
+  # Utility Tasks
+  # ========================================
+
+  check:prereqs:
+    desc: Check if required tools are installed
+    cmds:
+      - echo "Checking prerequisites..."
+      - |
+        command -v docker >/dev/null 2>&1 || { echo "docker not found"; exit 1; }
+        echo "docker"
+      - |
+        command -v docker-compose >/dev/null 2>&1 || { echo "docker-compose not found"; exit 1; }
+        echo "docker-compose"
+      - |
+        command -v az >/dev/null 2>&1 || { echo "azure-cli not found"; exit 1; }
+        echo "azure-cli"
+      - |
+        command -v pg_dump >/dev/null 2>&1 || { echo "postgresql-client not found"; exit 1; }
+        echo "postgresql-client (pg_dump)"
+      - echo "All prerequisites met!"

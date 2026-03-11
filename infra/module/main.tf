@@ -194,7 +194,7 @@ resource "azurerm_postgresql_flexible_server" "postgres" {
   # zone = "2" # if we want to pin the zone, the comment out the lifecycle block below
 
   sku_name   = var.postgres_sku_name
-  version    = "16"
+  version    = "17"
   storage_mb = 32768 # 32 GB minimum
 
   backup_retention_days        = 7

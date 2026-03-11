@@ -1,7 +1,9 @@
 *.grib
+*.zip
 .venv/
 __pycache__/
 .env
+.env.local
 
 # Terraform files
 .terraform/
@@ -21,6 +23,9 @@ crash.log
 crash.*.log
 
 .azurite/
+
+# Docker
+docker-compose.override.yml
 
 # IDE files
 *.swp
