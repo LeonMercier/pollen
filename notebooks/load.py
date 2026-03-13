@@ -26,6 +26,7 @@ connection_properties = {
     "user": postgres_username,
     "password": postgres_password,
     "driver": "org.postgresql.Driver",
+    "reWriteBatchedInserts": "true",  # PostgreSQL JDBC optimization: combines multiple INSERTs
 }
 
 # create the table if it doesnt already exist (without indexes initially)
@@ -126,7 +127,20 @@ try:
         mode="append",
         properties=connection_properties,
     )
-    print(f"Successfully loaded data into PostgreSQL database")
+
+    # Get row count from PostgreSQL (fast, uses table statistics)
+    connection = spark._jvm.java.sql.DriverManager.getConnection(
+        jdbc_url, postgres_username, postgres_password
+    )
+    statement = connection.createStatement()
+    result = statement.executeQuery("SELECT COUNT(*) FROM public.pollen_forecast")
+    # quirk: JDBC resultSet cursor starts on line before first line
+    result.next()
+    # index starts at 1
+    row_count = result.getLong(1)
+    connection.close()
+
+    print(f"Successfully loaded {row_count:,} rows into PostgreSQL database")
 except Exception as e:
     print(f"ERROR loading data to PostgreSQL: {str(e)}")
     raise
@@ -134,6 +148,7 @@ except Exception as e:
 # Recreate indexes after data load for optimal query performance
 # This is faster than updating indexes during each insert
 print("Recreating indexes (this may take 5-15 minutes depending on data size)...")
+
 try:
     connection = spark._jvm.java.sql.DriverManager.getConnection(
         jdbc_url, postgres_username, postgres_password
@@ -141,7 +156,8 @@ try:
     statement = connection.createStatement()
     statement.execute(create_indexes_sql)
     connection.close()
-    print("Indexes successfully recreated")
+    print("Indices successfully created")
+
 except Exception as e:
     print(f"ERROR recreating indexes: {str(e)}")
     raise
