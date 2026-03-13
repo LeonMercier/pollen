@@ -141,6 +141,42 @@ tasks:
       - rm api-deploy.zip
 
   # ========================================
+  # Azure Firewall Management
+  # ========================================
+
+  remote:allowip:dev:
+    desc: Add current IP to PostgreSQL firewall (dev)
+    vars:
+      TF_DIR: infra/environments/dev
+      PG_SERVER_NAME:
+        sh: cd {{.TF_DIR}} && terraform output -raw postgres_server_name
+      RG_NAME:
+        sh: cd {{.TF_DIR}} && terraform output -raw resource_group_name
+      MY_IP:
+        sh: curl -s https://api.ipify.org
+    cmds:
+      - echo "Adding IP {{.MY_IP}} to PostgreSQL firewall (dev)..."
+      - az postgres flexible-server firewall-rule create --resource-group {{.RG_NAME}} --name {{.PG_SERVER_NAME}} --rule-name allow-my-ip-$(date +%s) --start-ip-address {{.MY_IP}} --end-ip-address {{.MY_IP}}
+      - echo "Firewall rule created successfully!"
+      - echo "You can now connect to the database from {{.MY_IP}}"
+
+  remote:allowip:prod:
+    desc: Add current IP to PostgreSQL firewall (prod)
+    vars:
+      TF_DIR: infra/environments/prod
+      PG_SERVER_NAME:
+        sh: cd {{.TF_DIR}} && terraform output -raw postgres_server_name
+      RG_NAME:
+        sh: cd {{.TF_DIR}} && terraform output -raw resource_group_name
+      MY_IP:
+        sh: curl -s https://api.ipify.org
+    cmds:
+      - echo "Adding IP {{.MY_IP}} to PostgreSQL firewall (prod)..."
+      - az postgres flexible-server firewall-rule create --resource-group {{.RG_NAME}} --name {{.PG_SERVER_NAME}} --rule-name allow-my-ip-$(date +%s) --start-ip-address {{.MY_IP}} --end-ip-address {{.MY_IP}}
+      - echo "Firewall rule created successfully!"
+      - echo "You can now connect to the database from {{.MY_IP}}"
+
+  # ========================================
   # Utility Tasks
   # ========================================
 
