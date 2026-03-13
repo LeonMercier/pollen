@@ -24,7 +24,7 @@ def plot(latitude, longitude):
 
     if len(df) < 1:
         print("Error: got empty dataframe")
-        return "<p>Error</p>"
+        raise ValueError("No pollen forecast data found for the specified location")
     else:
         print(f"Got DF with {len(df)} rows")
 
@@ -51,4 +51,4 @@ def plot(latitude, longitude):
         ),
     )
 
-    return fig.to_html(full_html=False, include_plotlyjs="cdn")
+    return fig
