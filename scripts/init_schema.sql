@@ -25,3 +25,27 @@ CREATE INDEX IF NOT EXISTS idx_constituent
 
 CREATE INDEX IF NOT EXISTS idx_location 
     ON public.pollen_forecast(latitude, longitude);
+
+-- Cities table for geocoding support
+-- Needs to stay in sync with the schema defined in notebooks/geocode.py
+CREATE TABLE IF NOT EXISTS public.cities (
+    id SERIAL PRIMARY KEY,
+    geoname_id INTEGER NOT NULL UNIQUE,
+    name VARCHAR(200) NOT NULL,
+    ascii_name VARCHAR(200) NOT NULL,
+    country_code CHAR(2) NOT NULL,
+    admin1_code VARCHAR(20),
+    population BIGINT,
+    timezone VARCHAR(40),
+    latitude DECIMAL(9,6) NOT NULL,
+    longitude DECIMAL(9,6) NOT NULL,
+    pollen_latitude DECIMAL(9,6) NOT NULL,
+    pollen_longitude DECIMAL(9,6) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_cities_name ON public.cities (name);
+CREATE INDEX IF NOT EXISTS idx_cities_ascii_name ON public.cities (ascii_name);
+CREATE INDEX IF NOT EXISTS idx_cities_country ON public.cities (country_code);
+CREATE INDEX IF NOT EXISTS idx_cities_pollen_location ON public.cities (pollen_latitude, pollen_longitude);
+CREATE INDEX IF NOT EXISTS idx_cities_geoname ON public.cities (geoname_id);

@@ -18,11 +18,15 @@ LON_MAX=26.0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/../.env.local"
 TEMP_FILE="/tmp/pollen_dump.csv"
+CITIES_TEMP="/tmp/cities_dump.csv"
 
 # Cleanup function for error handling
 cleanup() {
     if [ -f "$TEMP_FILE" ]; then
         rm -f "$TEMP_FILE"
+    fi
+    if [ -f "$CITIES_TEMP" ]; then
+        rm -f "$CITIES_TEMP"
     fi
 }
 trap cleanup EXIT
@@ -132,8 +136,51 @@ echo "Cleaning up temporary files..."
 rm -f "$TEMP_FILE"
 
 echo ""
-echo "Database sync complete!"
-echo "Bounding box: latitude [$LAT_MIN, $LAT_MAX], longitude [$LON_MIN, $LON_MAX]"
-echo "Rows synced: $ROW_COUNT"
+echo "Syncing cities table..."
+
+# Extract all cities from Azure (no filtering - we want the full table)
+PGSSLMODE=require PGPASSWORD="$AZURE_DB_PASSWORD" psql \
+    --host="$AZURE_DB_HOST" \
+    --username="$AZURE_DB_USER" \
+    --dbname=pollen \
+    --no-password \
+    -c "COPY (SELECT * FROM public.cities ORDER BY id) TO STDOUT WITH CSV HEADER" \
+    > "$CITIES_TEMP" 2>/dev/null
+
+# Check if cities table exists and has data
+if [ $? -eq 0 ] && [ -f "$CITIES_TEMP" ]; then
+    CITIES_COUNT=$(wc -l < "$CITIES_TEMP")
+    CITIES_COUNT=$((CITIES_COUNT - 1))  # Subtract header row
+    
+    if [ $CITIES_COUNT -gt 0 ]; then
+        echo "Extracted $CITIES_COUNT cities from Azure"
+        echo "Loading cities to local PostgreSQL..."
+        
+        # Truncate local cities table
+        docker exec pollen-postgres-local psql -U pollen_user -d pollen \
+            -c "TRUNCATE TABLE public.cities CASCADE;" 2>/dev/null
+        
+        # Load cities data
+        docker exec -i pollen-postgres-local psql -U pollen_user -d pollen \
+            -c "COPY public.cities FROM STDIN WITH CSV HEADER" < "$CITIES_TEMP"
+        
+        if [ $? -eq 0 ]; then
+            echo "Loaded $CITIES_COUNT cities into local database"
+        else
+            echo "Warning: Failed to load cities data"
+        fi
+    else
+        echo "Warning: Cities table exists but is empty in Azure"
+        echo "Run the geocode notebook in Databricks to populate cities data"
+    fi
+    
+    rm -f "$CITIES_TEMP"
+else
+    echo "Warning: Cities table not found in Azure"
+    echo "Run the geocode notebook in Databricks to create and populate cities data"
+    rm -f "$CITIES_TEMP" 2>/dev/null
+fi
+
 echo ""
+echo "Database sync complete!"
 echo "You can now run the API locally with: task local:api"

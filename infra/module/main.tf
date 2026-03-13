@@ -350,6 +350,17 @@ resource "databricks_notebook" "plot" {
   ]
 }
 
+# Upload geocode notebook
+resource "databricks_notebook" "geocode" {
+  source = "${path.module}/../../notebooks/geocode.py"
+  path   = "/Workspace/notebooks/geocode"
+
+  depends_on = [
+    azurerm_role_assignment.adf_databricks,
+    databricks_secret_scope.secrets
+  ]
+}
+
 # ========================================
 # SECTION 9: Data Factory (Orchestration)
 # ========================================
