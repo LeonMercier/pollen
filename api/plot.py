@@ -37,17 +37,30 @@ def plot(latitude, longitude):
     # order df by forecast_datetime
     df = df.sort_values("forecast_datetime")
 
+    # Map constituent_type to user-facing display names
+    constituent_display_names = {
+        "Alnus": "Alder (Alnus)",
+        "Betula": "Birch (Betula)",
+        "Poaceae": "Grass (Poaceae)",
+        "Ambrosia": "Ragweed (Ambrosia)",
+        "Artemisia": "Mugwort (Artemisia)",
+        "64002": "Olive (Olea)",
+    }
+    df["constituent_display"] = df["constituent_type"].map(
+        lambda x: constituent_display_names.get(x, x)
+    )
+
     fig = px.line(
         df,
         x="forecast_datetime",
         y="constituent_value",
-        color="constituent_type",
+        color="constituent_display",
         title="Nice title",
         markers=True,
         labels=dict(
             forecast_datetime="Time",
             constituent_value="Pollen grains in m3 of air",
-            constituent_type="Pollen type",
+            constituent_display="Pollen type",
         ),
     )
 
