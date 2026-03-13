@@ -89,3 +89,47 @@ def get_sync_connection():
         sslmode=DATABASE_SSLMODE,
     )
     return conn
+
+
+def lookup_city_coordinates(city_name: str) -> tuple[float, float] | None:
+    """
+    Look up pollen grid coordinates for a city by name (case-insensitive).
+
+    Args:
+        city_name: City name to search for (exact match, case-insensitive)
+
+    Returns:
+        Tuple of (latitude, longitude) for the highest population match,
+        or None if city not found
+
+    Note:
+        Uses pollen_latitude and pollen_longitude which are snapped to
+        the 0.1-degree pollen forecast grid.
+    """
+    import psycopg
+
+    try:
+        conn = get_sync_connection()
+        with conn.cursor() as cur:
+            # Case-insensitive exact match on name or ascii_name
+            # Order by population DESC to get highest population city
+            cur.execute(
+                """
+                SELECT pollen_latitude, pollen_longitude
+                FROM public.cities
+                WHERE LOWER(name) = LOWER(%s) OR LOWER(ascii_name) = LOWER(%s)
+                ORDER BY population DESC NULLS LAST
+                LIMIT 1
+                """,
+                (city_name, city_name),
+            )
+            result = cur.fetchone()
+            conn.close()
+
+            if result:
+                return (float(result[0]), float(result[1]))
+            return None
+
+    except Exception as e:
+        print(f"Error looking up city '{city_name}': {str(e)}")
+        return None

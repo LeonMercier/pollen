@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 # local modules
+from database import lookup_city_coordinates
 from plot import plot
 
 app = FastAPI(
@@ -22,10 +23,25 @@ app = FastAPI(
 # lat: param name
 # float | None: type hint
 # = None: default value
-async def root(lat: float | None = None, lon: float | None = None):
+async def root(
+    lat: float | None = None, lon: float | None = None, city: str | None = None
+):
     """
     Root endpoint returning a simple HTML page.
+    Accepts either city name or lat/lon coordinates.
     """
+    # Resolve coordinates from city name if provided
+    resolved_lat = lat
+    resolved_lon = lon
+    city_not_found = False
+
+    if city:
+        coords = lookup_city_coordinates(city)
+        if coords:
+            resolved_lat, resolved_lon = coords
+        else:
+            city_not_found = True
+
     html_start = """
     <!DOCTYPE html>
     <html lang="en">
@@ -62,14 +78,16 @@ async def root(lat: float | None = None, lon: float | None = None):
         <div class="container">
             <h1>Pollen ETL API</h1>
             <p>Welcome to the Pollen ETL data pipeline API</p>
-            <a href="/?lat=60.15&lon=24.95">Helsinki</a>
-            <a href="/?lat=60.25&lon=22.15">Turku</a>
-            <a href="/?lat=61.25&lon=23.45">Tampere</a>
+            <a href="/?city=Helsinki">Helsinki</a>
+            <a href="/?city=Turku">Turku</a>
+            <a href="/?city=Tampere">Tampere</a>
     """
 
-    if lat and lon:
+    if city_not_found:
+        fig = f"<p>City '{city}' not found</p>"
+    elif resolved_lat and resolved_lon:
         try:
-            fig = plot(lat, lon)
+            fig = plot(resolved_lat, resolved_lon)
         except:
             fig = "<p>Error happened</p>"
     else:
