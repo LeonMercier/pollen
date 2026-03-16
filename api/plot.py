@@ -92,6 +92,7 @@ def plot_by_type(latitude, longitude) -> dict:
                 constituent_value="Pollen grains / m³",
             ),
         )
+        fig.update_layout(yaxis=dict(type="log", range=[0, 3]))
         figures[display_name] = fig
 
     return figures
