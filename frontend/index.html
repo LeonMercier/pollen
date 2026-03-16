@@ -111,6 +111,18 @@
         padding: 0.5rem;
         height: 22rem;
       }
+
+      footer {
+        margin-top: 2rem;
+        padding-bottom: 2rem;
+        font-size: 0.85rem;
+        opacity: 0.6;
+        text-align: left;
+      }
+
+      footer a {
+        color: white;
+      }
     </style>
   </head>
   <body>
@@ -132,6 +144,24 @@
 
       <div id="status-message"></div>
       <div id="plots-grid"></div>
+
+      <footer>
+        <ul>
+          <li>
+            Pollen data: Generated using
+            <a href="https://www.copernicus.eu"
+              >Copernicus Atmosphere Monitoring Service</a
+            >
+            information 2026. Neither the European Commission nor ECMWF is
+            responsible for any use that may be made of the Copernicus
+            information or data it contains.
+          </li>
+          <li>
+            City data:
+            <a href="https://www.geonames.org">GeoNames</a>
+          </li>
+        </ul>
+      </footer>
     </div>
 
     <script>
