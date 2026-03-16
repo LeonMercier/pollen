@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # local modules
 from database import lookup_city_coordinates
-from plot import plot
+from plot import plot, plot_by_type
 
 app = FastAPI(
     title="Pollen ETL API",
@@ -78,6 +78,51 @@ async def api_plot(city: str | None = None):
         }
     except Exception as e:
         return {"success": False, "error": "Error generating plot"}
+
+
+@app.get("/api/plots")
+async def api_plots(city: str | None = None):
+    """
+    API endpoint that returns one Plotly figure per pollen type as JSON.
+    Used by the frontend to render a responsive grid of charts.
+
+    Query params:
+        city: City name to search for
+
+    Returns:
+        JSON with 'success', 'city', 'lat', 'lon', and 'plots' dict keyed by
+        pollen display name, each containing 'data', 'layout', and 'config'.
+    """
+    if not city:
+        return {"success": False, "error": "City parameter is required"}
+
+    coords = lookup_city_coordinates(city)
+
+    if not coords:
+        return {"success": False, "error": f"City '{city}' not found"}
+
+    lat, lon = coords
+    try:
+        figures = plot_by_type(lat, lon)
+
+        plots = {}
+        for display_name, fig in figures.items():
+            fig_data = json.loads(fig.to_json())
+            plots[display_name] = {
+                "data": fig_data["data"],
+                "layout": fig_data["layout"],
+                "config": {"responsive": True},
+            }
+
+        return {
+            "success": True,
+            "city": city,
+            "lat": lat,
+            "lon": lon,
+            "plots": plots,
+        }
+    except Exception as e:
+        return {"success": False, "error": "Error generating plots"}
 
 
 @app.get("/health")

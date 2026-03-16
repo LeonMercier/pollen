@@ -1,172 +1,201 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pollen ETL API</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pollen Forecast</title>
     <script src="https://cdn.plot.ly/plotly-3.4.0.min.js"></script>
     <style>
-        body {
-            font-family: system-ui, -apple-system, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            margin: 0;
-            padding-top: 2rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        .container {
-            text-align: center;
-            padding: 2rem;
-            max-width: 1200px;
-            width: 100%;
-        }
-        h1 {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-        }
-        p {
-            font-size: 1.2rem;
-            opacity: 0.9;
-        }
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        min-height: 100vh;
+        margin: 0;
+        padding-top: 2rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+      .container {
+        text-align: center;
+        padding: 2rem;
+        max-width: 1400px;
+        width: 100%;
+      }
+      h1 {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+      }
+      p {
+        font-size: 1.2rem;
+        opacity: 0.9;
+      }
 
-        /* Search form styling */
-        #city-search-form {
-            margin: 2rem 0;
-            display: flex;
-            gap: 0.5rem;
-            justify-content: center;
-            align-items: center;
-        }
+      /* Search form */
+      #city-search-form {
+        margin: 2rem 0;
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        align-items: center;
+      }
 
-        #city-input {
-            padding: 0.75rem 1rem;
-            font-size: 1rem;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            min-width: 250px;
-            transition: all 0.3s ease;
-        }
+      #city-input {
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        min-width: 250px;
+        transition: all 0.3s ease;
+      }
 
-        #city-input::placeholder {
-            color: rgba(255, 255, 255, 0.6);
-        }
+      #city-input::placeholder {
+        color: rgba(255, 255, 255, 0.6);
+      }
 
-        #city-input:focus {
-            outline: none;
-            border-color: rgba(255, 255, 255, 0.8);
-            background: rgba(255, 255, 255, 0.2);
-        }
+      #city-input:focus {
+        outline: none;
+        border-color: rgba(255, 255, 255, 0.8);
+        background: rgba(255, 255, 255, 0.2);
+      }
 
-        #city-search-form button {
-            padding: 0.75rem 2rem;
-            font-size: 1rem;
-            border: none;
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 500;
-        }
+      #city-search-form button {
+        padding: 0.75rem 2rem;
+        font-size: 1rem;
+        border: none;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 500;
+      }
 
-        #city-search-form button:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
-        }
+      #city-search-form button:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-2px);
+      }
 
-        #city-search-form button:active {
-            transform: translateY(0);
-        }
+      #city-search-form button:active {
+        transform: translateY(0);
+      }
 
-        /* Plot container */
-        #plot-container {
-            margin-top: 2rem;
-            height: 60vh;
-            min-height: 30rem;
+      /* Status message shown before/during/on error */
+      #status-message {
+        margin-top: 2rem;
+      }
+
+      /* 2-column grid on wide screens, 1-column on narrow */
+      #plots-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+        margin-top: 2rem;
+      }
+
+      @media (max-width: 768px) {
+        #plots-grid {
+          grid-template-columns: 1fr;
         }
+      }
+
+      .plot-cell {
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 0.5rem;
+        height: 22rem;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container">
-        <h1>Pollen ETL API</h1>
-        <p>Welcome to the Pollen ETL data pipeline API</p>
+      <h1>Pollen Forecast</h1>
+      <p>Search for a city to see the pollen forecast</p>
 
-        <form id="city-search-form">
-            <input
-                type="text"
-                id="city-input"
-                name="city"
-                placeholder="Enter city name"
-                autocomplete="off"
-                required
-            />
-            <button type="submit">Search</button>
-        </form>
+      <form id="city-search-form">
+        <input
+          type="text"
+          id="city-input"
+          name="city"
+          placeholder="Enter city name"
+          autocomplete="off"
+          required
+        />
+        <button type="submit">Search</button>
+      </form>
 
-        <div id="plot-container">
-            <p>Search for a city</p>
-        </div>
+      <div id="status-message"></div>
+      <div id="plots-grid"></div>
     </div>
 
     <script>
-    // API_BASE_URL is substituted at deploy time:
-    //   prod:  https://<app-service-hostname>
-    //   local: http://localhost:8000
-    const API_BASE_URL = "%%API_BASE_URL%%";
+      // API_BASE_URL is substituted at deploy time:
+      //   prod:  https://<app-service-hostname>
+      //   local: http://localhost:8000
+      const API_BASE_URL = "%%API_BASE_URL%%";
 
-    document.addEventListener('DOMContentLoaded', function() {
-        const form = document.getElementById('city-search-form');
-        const input = document.getElementById('city-input');
-        const container = document.getElementById('plot-container');
+      document.addEventListener("DOMContentLoaded", function () {
+        const form = document.getElementById("city-search-form");
+        const input = document.getElementById("city-input");
+        const statusMessage = document.getElementById("status-message");
+        const plotsGrid = document.getElementById("plots-grid");
 
-        form.addEventListener('submit', async function(e) {
-            e.preventDefault();  // Prevent page reload
+        form.addEventListener("submit", async function (e) {
+          e.preventDefault();
 
-            const cityName = input.value.trim();
-            if (!cityName) {
-                container.innerHTML = '<p>Please enter a city name</p>';
-                return;
+          const cityName = input.value.trim();
+          if (!cityName) {
+            statusMessage.innerHTML = "<p>Please enter a city name</p>";
+            plotsGrid.innerHTML = "";
+            return;
+          }
+
+          statusMessage.innerHTML = "<p>Loading...</p>";
+          plotsGrid.innerHTML = "";
+
+          try {
+            const response = await fetch(
+              `${API_BASE_URL}/api/plots?city=${encodeURIComponent(cityName)}`,
+            );
+            const data = await response.json();
+
+            if (data.success) {
+              statusMessage.innerHTML = "";
+
+              // Render one chart per pollen type
+              for (const [pollenType, plotData] of Object.entries(data.plots)) {
+                const cell = document.createElement("div");
+                cell.className = "plot-cell";
+                plotsGrid.appendChild(cell);
+
+                Plotly.newPlot(
+                  cell,
+                  plotData.data,
+                  plotData.layout,
+                  plotData.config,
+                );
+              }
+
+              console.log(
+                `Loaded plots for ${data.city} (${data.lat}, ${data.lon})`,
+              );
+            } else {
+              statusMessage.innerHTML = `<p>${data.error}</p>`;
+              console.log(`Error: ${data.error}`);
             }
-
-            // Show loading state
-            container.innerHTML = '<p>Loading...</p>';
-
-            try {
-                // Make AJAX request to the API
-                const response = await fetch(`${API_BASE_URL}/api/plot?city=${encodeURIComponent(cityName)}`);
-                const data = await response.json();
-
-                // Check if request was successful
-                if (data.success) {
-                    // Clear loading message and render Plotly chart
-                    container.innerHTML = '';
-
-                    Plotly.newPlot(
-                        container,
-                        data.plotly_data,
-                        data.plotly_layout,
-                        data.plotly_config
-                    );
-
-                    console.log(`Loaded plot for ${data.city} (${data.lat}, ${data.lon})`);
-                } else {
-                    // Show error message
-                    container.innerHTML = `<p>${data.error}</p>`;
-                    console.log(`Error: ${data.error}`);
-                }
-
-            } catch (error) {
-                // Handle network errors
-                container.innerHTML = '<p>Error: Could not connect to server</p>';
-                console.error('Fetch error:', error);
-            }
+          } catch (error) {
+            statusMessage.innerHTML =
+              "<p>Error: Could not connect to server</p>";
+            console.error("Fetch error:", error);
+          }
         });
-    });
+      });
     </script>
-</body>
+  </body>
 </html>

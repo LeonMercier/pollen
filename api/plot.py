@@ -4,12 +4,18 @@ import pandas as pd
 # local
 from database import *
 
+CONSTITUENT_DISPLAY_NAMES = {
+    "Alnus": "Alder (Alnus)",
+    "Betula": "Birch (Betula)",
+    "Poaceae": "Grass (Poaceae)",
+    "Ambrosia": "Ragweed (Ambrosia)",
+    "Artemisia": "Mugwort (Artemisia)",
+    "64002": "Olive (Olea)",
+}
 
-def plot(latitude, longitude):
-    # SQL injection guard
-    lat = float(latitude)
-    lon = float(longitude)
 
+def _fetch_forecast_df(lat: float, lon: float) -> pd.DataFrame:
+    """Fetch and prepare the pollen forecast dataframe for a given location."""
     query = f"""
         (SELECT start_date, forecast_time, constituent_type, constituent_value
         FROM public.pollen_forecast
@@ -25,30 +31,28 @@ def plot(latitude, longitude):
     if len(df) < 1:
         print("Error: got empty dataframe")
         raise ValueError("No pollen forecast data found for the specified location")
-    else:
-        print(f"Got DF with {len(df)} rows")
 
-    # create new column forecast_datetime that is a sum of start_date and forecast_time
-    # forecast_time is stored as INT, so needs to be converted to timedelta
+    print(f"Got DF with {len(df)} rows")
+
+    # forecast_time is stored as INT hours offset from start_date
     df["forecast_datetime"] = df["start_date"] + pd.to_timedelta(
         df["forecast_time"], unit="h"
     )
-
-    # order df by forecast_datetime
     df = df.sort_values("forecast_datetime")
-
-    # Map constituent_type to user-facing display names
-    constituent_display_names = {
-        "Alnus": "Alder (Alnus)",
-        "Betula": "Birch (Betula)",
-        "Poaceae": "Grass (Poaceae)",
-        "Ambrosia": "Ragweed (Ambrosia)",
-        "Artemisia": "Mugwort (Artemisia)",
-        "64002": "Olive (Olea)",
-    }
     df["constituent_display"] = df["constituent_type"].map(
-        lambda x: constituent_display_names.get(x, x)
+        lambda x: CONSTITUENT_DISPLAY_NAMES.get(x, x)
     )
+
+    return df
+
+
+def plot(latitude, longitude):
+    """Return a single Plotly figure with all pollen types as separate traces."""
+    # SQL injection guard
+    lat = float(latitude)
+    lon = float(longitude)
+
+    df = _fetch_forecast_df(lat, lon)
 
     fig = px.line(
         df,
@@ -58,10 +62,36 @@ def plot(latitude, longitude):
         title="Nice title",
         markers=True,
         labels=dict(
-            forecast_datetime="Time",
+            forecast_datetime="Time (UTC)",
             constituent_value="Pollen grains in m3 of air",
             constituent_display="Pollen type",
         ),
     )
 
     return fig
+
+
+def plot_by_type(latitude, longitude) -> dict:
+    """Return a dict of Plotly figures, one per pollen type, keyed by display name."""
+    # SQL injection guard
+    lat = float(latitude)
+    lon = float(longitude)
+
+    df = _fetch_forecast_df(lat, lon)
+
+    figures = {}
+    for display_name, group_df in df.groupby("constituent_display"):
+        fig = px.line(
+            group_df,
+            x="forecast_datetime",
+            y="constituent_value",
+            title=display_name,
+            markers=True,
+            labels=dict(
+                forecast_datetime="Time (UTC)",
+                constituent_value="Pollen grains / m³",
+            ),
+        )
+        figures[display_name] = fig
+
+    return figures
