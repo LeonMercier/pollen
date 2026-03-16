@@ -63,6 +63,9 @@ resource "azurerm_linux_web_app" "api" {
     "DATABASE_USER"     = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.postgres_username.versionless_id})"
     "DATABASE_PASSWORD" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.postgres_password.versionless_id})"
     "DATABASE_SSLMODE"  = var.database_sslmode
+
+    # CORS - allow requests from the static frontend hosted on Azure Blob Storage
+    "ALLOWED_ORIGINS" = azurerm_storage_account.web.primary_web_endpoint
   }
 
   # ZIP deployment configuration

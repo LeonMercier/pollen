@@ -41,3 +41,9 @@ variable "database_sslmode" {
   type        = string
   default     = "require"
 }
+
+variable "enable_app_service" {
+  description = "Deploy the App Service and frontend stack (false = ETL-only)"
+  type        = bool
+  default     = false
+}

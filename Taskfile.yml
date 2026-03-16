@@ -89,6 +89,17 @@ tasks:
       - echo "Starting FastAPI on http://localhost:8000 (production mode)..."
       - cd {{.API_DIR}} && ENV=local uvicorn main:app --host 0.0.0.0 --port 8000
 
+  local:frontend:
+    desc: Serve the frontend locally on http://localhost:3000 (API must be on http://localhost:8000)
+    vars:
+      SERVE_DIR: /tmp/pollen-frontend
+    cmds:
+      - mkdir -p {{.SERVE_DIR}}
+      - sed 's|%%API_BASE_URL%%|http://localhost:8000|g' frontend/index.html > {{.SERVE_DIR}}/index.html
+      - echo "Frontend available at http://localhost:3000"
+      - echo "Make sure the API is running (task local:api)"
+      - python -m http.server 3000 --directory {{.SERVE_DIR}}
+
   # ========================================
   # Local Development - Combined Workflows
   # ========================================
@@ -139,6 +150,40 @@ tasks:
       - zip -r api-deploy.zip ./api
       - az webapp deployment source config-zip --name {{.APP_NAME}} --resource-group {{.RG_NAME}} --src ./api-deploy.zip
       - rm api-deploy.zip
+
+  remote:deployfrontend:dev:
+    desc: Deploy frontend to Azure Blob Storage static website (dev)
+    vars:
+      TF_DIR: infra/environments/dev
+      API_URL:
+        sh: cd {{.TF_DIR}} && terraform output -raw app_service_url
+      STORAGE_ACCOUNT:
+        sh: cd {{.TF_DIR}} && terraform output -raw web_storage_account_name
+    cmds:
+      - |
+        if [ -z "{{.API_URL}}" ]; then
+          echo "Error: App Service is not enabled in dev."
+          echo "Set enable_app_service = true in infra/environments/dev/terraform.tfvars and run terraform apply first."
+          exit 1
+        fi
+      - sed 's|%%API_BASE_URL%%|{{.API_URL}}|g' frontend/index.html > /tmp/pollen-index.html
+      - az storage blob upload --account-name {{.STORAGE_ACCOUNT}} --auth-mode login --container-name '$web' --file /tmp/pollen-index.html --name index.html --overwrite
+      - rm /tmp/pollen-index.html
+      - echo "Frontend deployed to dev static website"
+
+  remote:deployfrontend:prod:
+    desc: Deploy frontend to Azure Blob Storage static website (prod)
+    vars:
+      TF_DIR: infra/environments/prod
+      API_URL:
+        sh: cd {{.TF_DIR}} && terraform output -raw app_service_url
+      STORAGE_ACCOUNT:
+        sh: cd {{.TF_DIR}} && terraform output -raw web_storage_account_name
+    cmds:
+      - sed 's|%%API_BASE_URL%%|{{.API_URL}}|g' frontend/index.html > /tmp/pollen-index.html
+      - az storage blob upload --account-name {{.STORAGE_ACCOUNT}} --auth-mode login --container-name '$web' --file /tmp/pollen-index.html --name index.html --overwrite
+      - rm /tmp/pollen-index.html
+      - echo "Frontend deployed to prod static website"
 
   # ========================================
   # Azure Firewall Management

@@ -54,5 +54,5 @@ module "pollen" {
   databricks_node_type    = var.databricks_node_type
   adf_trigger_activated   = var.adf_trigger_activated
   database_sslmode        = var.database_sslmode
-  enable_app_service      = false
+  enable_app_service      = var.enable_app_service
 }
