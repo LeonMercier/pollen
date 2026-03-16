@@ -103,6 +103,11 @@ EUROPE_COUNTRIES = [
     "XK",
 ]
 
+GRID_WEST = -25.0
+GRID_EAST = 45.0
+GRID_SOUTH = 30.0
+GRID_NORTH = 72.0
+
 # COMMAND ----------
 
 # STEP 1: Download GeoNames cities500.zip from web
@@ -187,6 +192,16 @@ df_europe = df_cities.filter(col("country_code").isin(EUROPE_COUNTRIES))
 europe_count = df_europe.count()
 print(f"Filtered to {europe_count:,} European cities")
 
+print("Filtering to bounding box...")
+df_europe = df_europe.filter(
+    (col("latitude") >= GRID_SOUTH)
+    & (col("latitude") <= GRID_NORTH)
+    & (col("longitude") >= GRID_WEST)
+    & (col("longitude") <= GRID_EAST)
+)
+europe_count = df_europe.count()
+print(f"Filtered to {europe_count:,} European cities in bounding box")
+
 # Show sample cities
 print("\nSample European cities:")
 df_europe.select("name", "country_code", "population", "latitude", "longitude").show(
@@ -258,6 +273,8 @@ df_cross = df_europe.crossJoin(df_pollen_grid_broadcast)
 # See: https://en.wikipedia.org/wiki/Haversine_formula
 R = 6371  # Earth radius in kilometers
 
+# NOTE: distance_km is dropped in a later stage, but could be kept in the future
+# for debugging
 df_with_distance = df_cross.withColumn(
     "distance_km",
     2
