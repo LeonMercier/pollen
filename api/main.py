@@ -137,6 +137,7 @@ async def api_plots(city: str | None = None):
             "plots": plots,
         }
     except Exception as e:
+        print(f"Error generating plots for '{city}': {e}")
         return {"success": False, "error": "Error generating plots"}
 
 
