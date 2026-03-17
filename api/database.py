@@ -91,6 +91,50 @@ def get_sync_connection():
     return conn
 
 
+def search_cities(query: str, limit: int = 10) -> list[dict]:
+    """
+    Search for cities by ASCII name prefix (case-insensitive).
+
+    Args:
+        query: Prefix string to search for (must be at least 2 characters)
+        limit: Maximum number of results to return (default 10)
+
+    Returns:
+        List of dicts with 'name', 'ascii_name', and 'country_code' keys,
+        ordered by population descending. Returns empty list if query is too
+        short or on any DB error.
+    """
+    import psycopg
+
+    if len(query) < 2:
+        return []
+
+    try:
+        conn = get_sync_connection()
+        with conn.cursor() as cur:
+            # Prefix match on ascii_name; uses idx_cities_ascii_name index
+            cur.execute(
+                """
+                SELECT name, ascii_name, country_code
+                FROM public.cities
+                WHERE ascii_name ILIKE %s
+                ORDER BY population DESC NULLS LAST
+                LIMIT %s
+                """,
+                (f"{query}%", limit),
+            )
+            rows = cur.fetchall()
+            conn.close()
+            return [
+                {"name": row[0], "ascii_name": row[1], "country_code": row[2]}
+                for row in rows
+            ]
+
+    except Exception as e:
+        print(f"Error searching cities for '{query}': {str(e)}")
+        return []
+
+
 def lookup_city_coordinates(city_name: str) -> tuple[float, float] | None:
     """
     Look up pollen grid coordinates for a city by name (case-insensitive).

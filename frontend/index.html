@@ -44,6 +44,11 @@
         align-items: center;
       }
 
+      /* Wrapper gives the suggestions list an anchor for absolute positioning */
+      #city-input-wrapper {
+        position: relative;
+      }
+
       #city-input {
         padding: 0.75rem 1rem;
         font-size: 1rem;
@@ -53,6 +58,8 @@
         color: white;
         min-width: 250px;
         transition: all 0.3s ease;
+        width: 100%;
+        box-sizing: border-box;
       }
 
       #city-input::placeholder {
@@ -63,6 +70,47 @@
         outline: none;
         border-color: rgba(255, 255, 255, 0.8);
         background: rgba(255, 255, 255, 0.2);
+      }
+
+      /* Suggestions dropdown */
+      #city-suggestions {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: rgba(50, 30, 80, 0.97);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 8px;
+        list-style: none;
+        margin: 0;
+        padding: 0.25rem 0;
+        z-index: 100;
+        max-height: 260px;
+        overflow-y: auto;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        text-align: left;
+      }
+
+      #city-suggestions.open {
+        display: block;
+      }
+
+      #city-suggestions li {
+        padding: 0.6rem 1rem;
+        cursor: pointer;
+        font-size: 0.95rem;
+        color: rgba(255, 255, 255, 0.85);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: background 0.15s ease;
+      }
+
+      #city-suggestions li:hover,
+      #city-suggestions li.active {
+        background: rgba(255, 255, 255, 0.15);
+        color: white;
       }
 
       #city-search-form button {
@@ -131,14 +179,17 @@
       <p>Search for a city to see the pollen forecast</p>
 
       <form id="city-search-form">
-        <input
-          type="text"
-          id="city-input"
-          name="city"
-          placeholder="Enter city name"
-          autocomplete="off"
-          required
-        />
+        <div id="city-input-wrapper">
+          <input
+            type="text"
+            id="city-input"
+            name="city"
+            placeholder="Enter city name"
+            autocomplete="off"
+            required
+          />
+          <ul id="city-suggestions" role="listbox" aria-label="City suggestions"></ul>
+        </div>
         <button type="submit">Search</button>
       </form>
 
@@ -173,11 +224,128 @@
       document.addEventListener("DOMContentLoaded", function () {
         const form = document.getElementById("city-search-form");
         const input = document.getElementById("city-input");
+        const suggestions = document.getElementById("city-suggestions");
         const statusMessage = document.getElementById("status-message");
         const plotsGrid = document.getElementById("plots-grid");
 
+        // --- Autocomplete state ---
+        let debounceTimer = null;
+        let activeIndex = -1; // keyboard-highlighted suggestion index
+
+        function openSuggestions(items) {
+          suggestions.innerHTML = "";
+          activeIndex = -1;
+
+          items.forEach((city) => {
+            const li = document.createElement("li");
+            li.textContent = `${city.name}, ${city.country_code}`;
+            li.dataset.value = city.ascii_name;
+            li.setAttribute("role", "option");
+            li.addEventListener("mousedown", function (e) {
+              // mousedown fires before blur; prevent input from losing focus
+              e.preventDefault();
+              selectSuggestion(city);
+            });
+            suggestions.appendChild(li);
+          });
+
+          if (items.length > 0) {
+            suggestions.classList.add("open");
+          } else {
+            suggestions.classList.remove("open");
+          }
+        }
+
+        function closeSuggestions() {
+          suggestions.classList.remove("open");
+          suggestions.innerHTML = "";
+          activeIndex = -1;
+        }
+
+        function setActiveItem(index) {
+          const items = suggestions.querySelectorAll("li");
+          items.forEach((li) => li.classList.remove("active"));
+          if (index >= 0 && index < items.length) {
+            items[index].classList.add("active");
+            items[index].scrollIntoView({ block: "nearest" });
+          }
+          activeIndex = index;
+        }
+
+        function selectSuggestion(city) {
+          input.value = city.ascii_name;
+          closeSuggestions();
+          form.requestSubmit();
+        }
+
+        // Fetch suggestions from /api/cities?q=<query> with 300ms debounce
+        input.addEventListener("input", function () {
+          clearTimeout(debounceTimer);
+          const query = input.value.trim();
+
+          if (query.length < 2) {
+            closeSuggestions();
+            return;
+          }
+
+          debounceTimer = setTimeout(async function () {
+            try {
+              const resp = await fetch(
+                `${API_BASE_URL}/api/cities?q=${encodeURIComponent(query)}`,
+              );
+              if (!resp.ok) {
+                closeSuggestions();
+                return;
+              }
+              const cities = await resp.json();
+              openSuggestions(cities);
+            } catch {
+              closeSuggestions();
+            }
+          }, 300);
+        });
+
+        // Keyboard navigation: ↑ ↓ Enter Escape
+        input.addEventListener("keydown", function (e) {
+          const items = suggestions.querySelectorAll("li");
+          if (!suggestions.classList.contains("open")) return;
+
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActiveItem(Math.min(activeIndex + 1, items.length - 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActiveItem(Math.max(activeIndex - 1, 0));
+          } else if (e.key === "Enter") {
+            if (activeIndex >= 0 && items[activeIndex]) {
+              e.preventDefault();
+              const value = items[activeIndex].dataset.value;
+              const name = items[activeIndex].textContent;
+              input.value = value;
+              closeSuggestions();
+              form.requestSubmit();
+            }
+          } else if (e.key === "Escape") {
+            closeSuggestions();
+          }
+        });
+
+        // Close dropdown when focus leaves the input
+        input.addEventListener("blur", function () {
+          closeSuggestions();
+        });
+
+        // Close dropdown on outside click (belt-and-suspenders with blur)
+        document.addEventListener("click", function (e) {
+          if (!form.contains(e.target)) {
+            closeSuggestions();
+          }
+        });
+
+        // --- Chart loading ---
         form.addEventListener("submit", async function (e) {
           e.preventDefault();
+          closeSuggestions();
 
           const cityName = input.value.trim();
           if (!cityName) {

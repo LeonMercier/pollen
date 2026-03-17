@@ -8,11 +8,11 @@ The frontend is served as a static file hosted separately (frontend/index.html).
 import json
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 # local modules
-from database import lookup_city_coordinates
+from database import lookup_city_coordinates, search_cities
 from plot import plot, plot_by_type
 
 app = FastAPI(
@@ -35,6 +35,21 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=["*"],
 )
+
+
+@app.get("/api/cities")
+async def api_cities(q: str = Query(min_length=2)):
+    """
+    City autocomplete endpoint. Returns up to 10 city suggestions for a
+    given prefix query (case-insensitive match on ASCII city name).
+
+    Query params:
+        q: Prefix string to search for (minimum 2 characters)
+
+    Returns:
+        JSON list of objects with 'name', 'ascii_name', and 'country_code'.
+    """
+    return search_cities(q)
 
 
 @app.get("/api/plot")
