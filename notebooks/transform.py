@@ -63,7 +63,8 @@ dbfs_silver_path = f"dbfs:/mnt/pollen/silver/grib_data_{timestamp}/"
 # Spark jobs, hence the batching.
 
 # Counterintuitively, OOM is more likely in multi-node configs than single-node.
-BATCH_SIZE = 50
+# BATCH_SIZE=5 works when full geo-area is used
+BATCH_SIZE = 5
 df_batch = []
 grb_count = 0
 batch_number = 0
