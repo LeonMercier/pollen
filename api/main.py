@@ -67,16 +67,17 @@ async def api_plot(city: str | None = None):
     if not city:
         return {"success": False, "error": "City parameter is required"}
 
-    # Look up city coordinates
-    coords = lookup_city_coordinates(city)
+    # Look up city coordinates and timezone
+    result = lookup_city_coordinates(city)
 
-    if not coords:
+    if not result:
         return {"success": False, "error": f"City '{city}' not found"}
 
-    # Get plot figure
-    lat, lon = coords
+    # Unpack coordinates and timezone
+    lat, lon, timezone_name = result
+
     try:
-        fig = plot(lat, lon)  # Returns a figure object
+        fig = plot(lat, lon, timezone_name)  # Pass timezone to plot function
 
         # Use Plotly's built-in JSON serialization (idiomatic way)
         fig_json_str = fig.to_json()
@@ -111,14 +112,14 @@ async def api_plots(city: str | None = None):
     if not city:
         return {"success": False, "error": "City parameter is required"}
 
-    coords = lookup_city_coordinates(city)
+    result = lookup_city_coordinates(city)
 
-    if not coords:
+    if not result:
         return {"success": False, "error": f"City '{city}' not found"}
 
-    lat, lon = coords
+    lat, lon, timezone_name = result
     try:
-        figures = plot_by_type(lat, lon)
+        figures = plot_by_type(lat, lon, timezone_name)
 
         plots = {}
         for display_name, fig in figures.items():

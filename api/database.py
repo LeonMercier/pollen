@@ -135,16 +135,17 @@ def search_cities(query: str, limit: int = 10) -> list[dict]:
         return []
 
 
-def lookup_city_coordinates(city_name: str) -> tuple[float, float] | None:
+def lookup_city_coordinates(city_name: str) -> tuple[float, float, str] | None:
     """
-    Look up pollen grid coordinates for a city by name (case-insensitive).
+    Look up pollen grid coordinates and timezone for a city by name (case-insensitive).
 
     Args:
         city_name: City name to search for (exact match, case-insensitive)
 
     Returns:
-        Tuple of (latitude, longitude) for the highest population match,
-        or None if city not found
+        Tuple of (latitude, longitude, timezone) for the highest population match,
+        or None if city not found. Timezone is an IANA timezone string (e.g., "America/New_York")
+        or "UTC" if timezone is not available in the database.
 
     Note:
         Uses pollen_latitude and pollen_longitude which are snapped to
@@ -159,7 +160,7 @@ def lookup_city_coordinates(city_name: str) -> tuple[float, float] | None:
             # Order by population DESC to get highest population city
             cur.execute(
                 """
-                SELECT pollen_latitude, pollen_longitude
+                SELECT pollen_latitude, pollen_longitude, timezone
                 FROM public.cities
                 WHERE LOWER(name) = LOWER(%s) OR LOWER(ascii_name) = LOWER(%s)
                 ORDER BY population DESC NULLS LAST
@@ -171,7 +172,8 @@ def lookup_city_coordinates(city_name: str) -> tuple[float, float] | None:
             conn.close()
 
             if result:
-                return (float(result[0]), float(result[1]))
+                timezone = result[2] if result[2] else "UTC"
+                return (float(result[0]), float(result[1]), timezone)
             return None
 
     except Exception as e:

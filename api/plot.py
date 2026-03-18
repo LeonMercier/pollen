@@ -1,5 +1,6 @@
 import plotly.express as px
 import pandas as pd
+from zoneinfo import ZoneInfo
 
 # local
 from database import *
@@ -85,8 +86,18 @@ def _add_severity_bands(fig, constituent_type: str) -> None:
     )
 
 
-def _fetch_forecast_df(lat: float, lon: float) -> pd.DataFrame:
-    """Fetch and prepare the pollen forecast dataframe for a given location."""
+def _fetch_forecast_df(lat: float, lon: float, timezone_name: str) -> pd.DataFrame:
+    """
+    Fetch and prepare the pollen forecast dataframe for a given location.
+
+    Args:
+        lat: Latitude of the location
+        lon: Longitude of the location
+        timezone_name: IANA timezone name (e.g., "America/New_York") for time conversion
+
+    Returns:
+        DataFrame with forecast_datetime converted to local timezone
+    """
     query = f"""
         (SELECT start_date, forecast_time, constituent_type, constituent_value
         FROM public.pollen_forecast
@@ -112,6 +123,22 @@ def _fetch_forecast_df(lat: float, lon: float) -> pd.DataFrame:
     df["forecast_datetime"] = df["start_date"] + pd.to_timedelta(
         df["forecast_time"], unit="h"
     )
+
+    # Convert from UTC to local timezone
+    # First localize to UTC (make timezone-aware), then convert to target timezone
+    try:
+        df["forecast_datetime"] = (
+            df["forecast_datetime"]
+            .dt.tz_localize("UTC")
+            .dt.tz_convert(ZoneInfo(timezone_name))
+        )
+        print(f"Converted times to timezone: {timezone_name}")
+    except Exception as e:
+        print(f"WARNING: Could not convert to timezone '{timezone_name}': {str(e)}")
+        print("Falling back to UTC")
+        # Keep as UTC if timezone conversion fails
+        df["forecast_datetime"] = df["forecast_datetime"].dt.tz_localize("UTC")
+
     df = df.sort_values("forecast_datetime")
     df["constituent_display"] = df["constituent_type"].map(
         lambda x: CONSTITUENT_DISPLAY_NAMES.get(x, x)
@@ -120,13 +147,20 @@ def _fetch_forecast_df(lat: float, lon: float) -> pd.DataFrame:
     return df
 
 
-def plot(latitude, longitude):
-    """Return a single Plotly figure with all pollen types as separate traces."""
+def plot(latitude, longitude, timezone_name: str):
+    """
+    Return a single Plotly figure with all pollen types as separate traces.
+
+    Args:
+        latitude: Latitude of the location
+        longitude: Longitude of the location
+        timezone_name: IANA timezone name for x-axis labels
+    """
     # SQL injection guard
     lat = float(latitude)
     lon = float(longitude)
 
-    df = _fetch_forecast_df(lat, lon)
+    df = _fetch_forecast_df(lat, lon, timezone_name)
 
     fig = px.line(
         df,
@@ -136,7 +170,7 @@ def plot(latitude, longitude):
         title="Nice title",
         markers=True,
         labels=dict(
-            forecast_datetime="Time (UTC)",
+            forecast_datetime="Local Time",
             constituent_value="Pollen grains in m3 of air",
             constituent_display="Pollen type",
         ),
@@ -145,13 +179,20 @@ def plot(latitude, longitude):
     return fig
 
 
-def plot_by_type(latitude, longitude) -> dict:
-    """Return a dict of Plotly figures, one per pollen type, keyed by display name."""
+def plot_by_type(latitude, longitude, timezone_name: str) -> dict:
+    """
+    Return a dict of Plotly figures, one per pollen type, keyed by display name.
+
+    Args:
+        latitude: Latitude of the location
+        longitude: Longitude of the location
+        timezone_name: IANA timezone name for x-axis labels
+    """
     # SQL injection guard
     lat = float(latitude)
     lon = float(longitude)
 
-    df = _fetch_forecast_df(lat, lon)
+    df = _fetch_forecast_df(lat, lon, timezone_name)
 
     # y-axis upper bound (log10 units); must match update_layout range below
     LOG_Y_MAX = 3
@@ -166,7 +207,7 @@ def plot_by_type(latitude, longitude) -> dict:
             title=display_name,
             markers=True,
             labels=dict(
-                forecast_datetime="Time (UTC)",
+                forecast_datetime="Local Time",
                 constituent_value="Pollen grains / m³",
             ),
         )
