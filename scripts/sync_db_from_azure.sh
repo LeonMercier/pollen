@@ -9,10 +9,10 @@ set -e
 # - .env.local file with AZURE_KEY_VAULT_NAME configured
 
 # Coordinate boundaries to filter data
-LAT_MIN=60.0
-LAT_MAX=62.0
-LON_MIN=22.0
-LON_MAX=26.0
+LAT_MIN=56.0
+LAT_MAX=71.0
+LON_MIN=3.0
+LON_MAX=36.0
 
 # Load environment variables from .env.local
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

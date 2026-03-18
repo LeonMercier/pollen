@@ -124,7 +124,7 @@ blob_service_client = BlobServiceClient(
 # Upload to $web container (static website hosting container)
 container_name = "$web"
 
-blob_name = "index.html"
+blob_name = "old_index.html"
 try:
     blob_client = blob_service_client.get_blob_client(
         container=container_name, blob=blob_name
