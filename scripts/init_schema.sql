@@ -2,9 +2,18 @@
 -- This file is automatically run when the container first starts
 -- Needs to stay in sync with the schema defined in notebooks/load.py
 --
--- NOTE: For local development, indexes are created immediately since the database
--- starts empty. In the production ETL pipeline (notebooks/load.py), indexes are
--- dropped before bulk loading and recreated afterward for optimal performance.
+-- PRODUCTION DEPLOYMENT PATTERN (notebooks/load.py):
+-- The production ETL pipeline uses a blue-green deployment strategy for zero-downtime updates:
+--   1. Load new data into pollen_forecast_staging table
+--   2. Build indexes on staging table (production stays fast)
+--   3. Validate staging data (constituent count, row count)
+--   4. Atomically swap: staging → production (millisecond operation)
+--   5. Drop old production table
+-- This ensures the API always has access to complete, indexed data.
+--
+-- LOCAL DEVELOPMENT:
+-- For local dev, we only create the production table since we don't need zero-downtime.
+-- Indexes are created immediately since the database starts empty.
 
 CREATE TABLE IF NOT EXISTS public.pollen_forecast (
     id SERIAL PRIMARY KEY,
