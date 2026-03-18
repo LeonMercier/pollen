@@ -205,13 +205,14 @@ def plot_by_type(latitude, longitude, timezone_name: str) -> dict:
             x="forecast_datetime",
             y="constituent_value",
             title=display_name,
-            markers=True,
+            # markers=True,
             labels=dict(
                 forecast_datetime="Local Time",
                 constituent_value="Pollen grains / m³",
             ),
         )
         fig.update_layout(yaxis=dict(type="log", range=[0, LOG_Y_MAX]))
+        fig.update_traces(line_shape="spline")
         _add_severity_bands(fig, constituent_type)
         figures[display_name] = fig
 
