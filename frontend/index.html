@@ -158,6 +158,99 @@
         border-radius: 12px;
         padding: 0.5rem;
         height: 22rem;
+        cursor: pointer;
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+
+      .plot-cell:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      }
+
+      /* Modal/Lightbox styles */
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .modal.open {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        opacity: 1;
+      }
+
+      .modal-backdrop {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        cursor: pointer;
+      }
+
+      .modal-content {
+        position: relative;
+        background: rgba(255, 255, 255, 1);
+        border-radius: 16px;
+        padding: 2rem;
+        max-width: 95vw;
+        max-height: 90vh;
+        width: 1200px;
+        z-index: 1001;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+
+      .modal-close {
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        background: rgba(0, 0, 0, 0.2);
+        border: none;
+        font-size: 2rem;
+        color: #333;
+        cursor: pointer;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        transition: all 0.2s ease;
+        z-index: 1002;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+      }
+
+      .modal-close:hover {
+        background: rgba(0, 0, 0, 0.3);
+        transform: scale(1.1);
+      }
+
+      #modal-plot-container {
+        width: 100%;
+        height: 70vh;
+        min-height: 500px;
+      }
+
+      @media (max-width: 768px) {
+        #modal-plot-container {
+          height: 60vh;
+          min-height: 400px;
+        }
+
+        .modal-content {
+          padding: 1rem;
+        }
       }
 
       footer {
@@ -188,13 +281,32 @@
             autocomplete="off"
             required
           />
-          <ul id="city-suggestions" role="listbox" aria-label="City suggestions"></ul>
+          <ul
+            id="city-suggestions"
+            role="listbox"
+            aria-label="City suggestions"
+          ></ul>
         </div>
         <button type="submit">Search</button>
       </form>
 
       <div id="status-message"></div>
       <div id="plots-grid"></div>
+
+      <!-- Modal/Lightbox for enlarged plot view -->
+      <div
+        id="plot-modal"
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-hidden="true"
+      >
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+          <button class="modal-close" aria-label="Close">&times;</button>
+          <div id="modal-plot-container"></div>
+        </div>
+      </div>
 
       <footer>
         <ul>
@@ -370,6 +482,12 @@
               for (const [pollenType, plotData] of Object.entries(data.plots)) {
                 const cell = document.createElement("div");
                 cell.className = "plot-cell";
+                cell.setAttribute("role", "button");
+                cell.setAttribute("tabindex", "0");
+                cell.setAttribute(
+                  "aria-label",
+                  `Click to enlarge ${pollenType} chart`,
+                );
                 plotsGrid.appendChild(cell);
 
                 Plotly.newPlot(
@@ -378,6 +496,19 @@
                   plotData.layout,
                   plotData.config,
                 );
+
+                // Click handler to open modal
+                cell.addEventListener("click", function () {
+                  openModal(plotData);
+                });
+
+                // Keyboard support (Enter/Space)
+                cell.addEventListener("keydown", function (e) {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openModal(plotData);
+                  }
+                });
               }
 
               console.log(
@@ -393,6 +524,62 @@
             console.error("Fetch error:", error);
           }
         });
+
+        // --- Modal/Lightbox functionality ---
+        const modal = document.getElementById("plot-modal");
+        const modalPlotContainer = document.getElementById(
+          "modal-plot-container",
+        );
+        const modalClose = modal.querySelector(".modal-close");
+        const modalBackdrop = modal.querySelector(".modal-backdrop");
+
+        let currentModalPlotData = null;
+
+        function openModal(plotData) {
+          currentModalPlotData = plotData;
+          modal.classList.add("open");
+          modal.setAttribute("aria-hidden", "false");
+          document.body.style.overflow = "hidden"; // prevent background scroll
+
+          // Re-render plot at larger size
+          Plotly.newPlot(modalPlotContainer, plotData.data, plotData.layout, {
+            ...plotData.config,
+            responsive: true,
+          });
+
+          // Focus close button for accessibility
+          modalClose.focus();
+        }
+
+        function closeModal() {
+          modal.classList.remove("open");
+          modal.setAttribute("aria-hidden", "true");
+          document.body.style.overflow = ""; // restore scroll
+
+          // Clear the plot to free memory
+          Plotly.purge(modalPlotContainer);
+          currentModalPlotData = null;
+        }
+
+        // Close button click
+        modalClose.addEventListener("click", closeModal);
+
+        // Backdrop click
+        modalBackdrop.addEventListener("click", closeModal);
+
+        // Escape key
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape" && modal.classList.contains("open")) {
+            closeModal();
+          }
+        });
+
+        // Prevent modal content clicks from closing modal
+        modal
+          .querySelector(".modal-content")
+          .addEventListener("click", function (e) {
+            e.stopPropagation();
+          });
       });
     </script>
   </body>
