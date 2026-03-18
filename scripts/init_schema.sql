@@ -15,8 +15,8 @@
 -- For local dev, we only create the production table since we don't need zero-downtime.
 -- Indexes are created immediately since the database starts empty.
 
+-- No primary key, not strictly necessary, improve performance
 CREATE TABLE IF NOT EXISTS public.pollen_forecast (
-    id SERIAL PRIMARY KEY,
     start_date TIMESTAMP NOT NULL,
     load_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     constituent_type VARCHAR(50) NOT NULL,

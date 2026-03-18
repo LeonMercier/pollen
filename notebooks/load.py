@@ -38,9 +38,9 @@ connection_properties = {
 # This ensures zero downtime and consistent data for API users
 
 # Schema for production table
+# No primary key, not strictly necessary, improve performance
 create_table_sql = """
 CREATE TABLE IF NOT EXISTS public.pollen_forecast (
-    id SERIAL PRIMARY KEY,
     start_date TIMESTAMP NOT NULL,
     load_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     constituent_type VARCHAR(50) NOT NULL,
@@ -137,7 +137,7 @@ except Exception as e:
 # Use 2-6 partitions for better IOPS utilization on B1ms SKU
 current_partitions = df.rdd.getNumPartitions()
 partition_count = min(6, max(2, current_partitions))
-df = df.coalesce(partition_count)
+df = df.coalesce(2)
 print(f"Using {partition_count} partitions for parallel loading")
 
 try:
@@ -178,11 +178,11 @@ try:
         jdbc_url, postgres_username, postgres_password
     )
     statement = connection.createStatement()
-    
+
     # Use _staging suffix for staging table indexes
     staging_indexes = create_indexes_template.format(suffix="_staging")
     statement.execute(staging_indexes)
-    
+
     connection.close()
     print("✓ Indexes successfully created on staging table")
 
@@ -197,27 +197,27 @@ try:
         jdbc_url, postgres_username, postgres_password
     )
     statement = connection.createStatement()
-    
+
     # Check 1: Verify we have data for all expected pollen constituents
     result = statement.executeQuery(
         "SELECT COUNT(DISTINCT constituent_type) FROM public.pollen_forecast_staging"
     )
     result.next()
     constituent_count = result.getInt(1)
-    
+
     # Check 2: Verify we have reasonable data volume (not empty)
     result = statement.executeQuery(
         "SELECT COUNT(*) FROM public.pollen_forecast_staging"
     )
     result.next()
     staging_row_count = result.getLong(1)
-    
+
     connection.close()
-    
+
     # Validation thresholds
     EXPECTED_CONSTITUENTS = 6  # Alnus, Betula, Poaceae, Ambrosia, Artemisia, Olive
     MIN_ROWS = 1000  # Sanity check for minimum data
-    
+
     if constituent_count < EXPECTED_CONSTITUENTS:
         raise ValueError(
             f"Expected {EXPECTED_CONSTITUENTS} pollen constituents, found {constituent_count}"
@@ -226,9 +226,11 @@ try:
         raise ValueError(
             f"Staging table has suspiciously few rows: {staging_row_count}"
         )
-    
-    print(f"✓ Validation passed: {constituent_count} constituents, {staging_row_count:,} rows")
-    
+
+    print(
+        f"✓ Validation passed: {constituent_count} constituents, {staging_row_count:,} rows"
+    )
+
 except Exception as e:
     print(f"ERROR: Validation failed: {str(e)}")
     print("ABORTING: Staging table will NOT be swapped to production")
@@ -242,12 +244,12 @@ try:
         jdbc_url, postgres_username, postgres_password
     )
     statement = connection.createStatement()
-    
+
     # Execute the swap in a transaction (atomic!)
     statement.execute(swap_tables_sql)
-    
+
     connection.close()
-    
+
     print("=" * 60)
     print("✓ SUCCESS! Table swap complete - new data is now live")
     print("=" * 60)

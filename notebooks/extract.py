@@ -131,7 +131,7 @@ request = {
     ],
     "data_format": "grib",
     # empty area downloads entire thing
-    # "area": [61.35, 22.05, 60.05, 25.05],
+    "area": [70, 10, 58, 31],
 }
 ####################################################
 
