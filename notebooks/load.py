@@ -82,7 +82,7 @@ BEGIN;
 COMMIT;
 
 -- Clean up old table after successful swap
-DROP TABLE IF EXISTS public.pollen_forecast_old;
+DROP TABLE IF EXISTS public.pollen_forecast_old CASCADE;
 """
 
 # execute database creation

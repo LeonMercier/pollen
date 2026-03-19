@@ -79,12 +79,13 @@ echo "   Filtering: latitude [$LAT_MIN, $LAT_MAX], longitude [$LON_MIN, $LON_MAX
 
 # Extract data from Azure using psql with COPY TO STDOUT
 # Filters data within the specified bounding box
+# Note: Explicitly select columns to match local schema (no id column)
 PGSSLMODE=require PGPASSWORD="$AZURE_DB_PASSWORD" psql \
     --host="$AZURE_DB_HOST" \
     --username="$AZURE_DB_USER" \
     --dbname=pollen \
     --no-password \
-    -c "COPY (SELECT * FROM public.pollen_forecast WHERE latitude BETWEEN $LAT_MIN AND $LAT_MAX AND longitude BETWEEN $LON_MIN AND $LON_MAX ORDER BY start_date, forecast_time) TO STDOUT WITH CSV HEADER" \
+    -c "COPY (SELECT start_date, load_timestamp, constituent_type, latitude, longitude, constituent_value, forecast_time FROM public.pollen_forecast WHERE latitude BETWEEN $LAT_MIN AND $LAT_MAX AND longitude BETWEEN $LON_MIN AND $LON_MAX ORDER BY start_date, forecast_time) TO STDOUT WITH CSV HEADER" \
     > "$TEMP_FILE"
 
 if [ $? -ne 0 ]; then
@@ -120,7 +121,7 @@ echo "Local table truncated"
 # Load data into local database using COPY FROM STDIN
 if [ $ROW_COUNT -gt 0 ]; then
     docker exec -i pollen-postgres-local psql -U pollen_user -d pollen \
-        -c "COPY public.pollen_forecast FROM STDIN WITH CSV HEADER" < "$TEMP_FILE"
+        -c "COPY public.pollen_forecast (start_date, load_timestamp, constituent_type, latitude, longitude, constituent_value, forecast_time) FROM STDIN WITH CSV HEADER" < "$TEMP_FILE"
 
     if [ $? -ne 0 ]; then
         echo "Failed to load data into local database"
