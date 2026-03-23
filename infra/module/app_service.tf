@@ -55,6 +55,9 @@ resource "azurerm_linux_web_app" "api" {
     "ENABLE_ORYX_BUILD"                   = "true"
     "WEBSITES_ENABLE_APP_SERVICE_STORAGE" = "false"
 
+    # Application mode (remote vs local) currently only checks for 'local'
+    "ENV" = "remote"
+
     # Database connection settings (from Key Vault)
     # Note: Key Vault references require the App Service managed identity to have access
     "DATABASE_HOST"     = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.postgres_fqdn.versionless_id})"
@@ -65,7 +68,8 @@ resource "azurerm_linux_web_app" "api" {
     "DATABASE_SSLMODE"  = var.database_sslmode
 
     # CORS - allow requests from the static frontend hosted on Azure Blob Storage
-    "ALLOWED_ORIGINS" = azurerm_storage_account.web.primary_web_endpoint
+    # remove trailing slash (azure returns with slash, browsers normalize requests to no slash)
+    "ALLOWED_ORIGINS" = trimsuffix(azurerm_storage_account.web.primary_web_endpoint, "/")
   }
 
   # ZIP deployment configuration
