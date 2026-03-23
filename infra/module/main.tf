@@ -668,3 +668,15 @@ resource "databricks_secret" "storage_account_key" {
 
   depends_on = [databricks_secret_scope.secrets]
 }
+
+# Grant Storage Blob Data Contributor role to the current user
+# This allows frontend deployment via 'task remote:deployfrontend:dev'
+resource "azurerm_role_assignment" "storage_blob_contributor" {
+  scope                = azurerm_storage_account.web.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = data.azurerm_client_config.current.object_id
+
+  depends_on = [
+    azurerm_storage_account.web
+  ]
+}
