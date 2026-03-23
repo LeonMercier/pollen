@@ -478,6 +478,9 @@
             if (data.success) {
               statusMessage.innerHTML = "";
 
+              // Store timezone from API response
+              const cityTimezone = data.timezone;
+
               // Render one chart per pollen type
               for (const [pollenType, plotData] of Object.entries(data.plots)) {
                 const cell = document.createElement("div");
@@ -490,6 +493,9 @@
                 );
                 plotsGrid.appendChild(cell);
 
+                // Add current time indicator if within forecast range
+                addCurrentTimeIndicator(plotData, cityTimezone);
+
                 Plotly.newPlot(
                   cell,
                   plotData.data,
@@ -499,20 +505,20 @@
 
                 // Click handler to open modal
                 cell.addEventListener("click", function () {
-                  openModal(plotData);
+                  openModal(plotData, cityTimezone);
                 });
 
                 // Keyboard support (Enter/Space)
                 cell.addEventListener("keydown", function (e) {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    openModal(plotData);
+                    openModal(plotData, cityTimezone);
                   }
                 });
               }
 
               console.log(
-                `Loaded plots for ${data.city} (${data.lat}, ${data.lon})`,
+                `Loaded plots for ${data.city} (${data.lat}, ${data.lon}, ${cityTimezone})`,
               );
             } else {
               statusMessage.innerHTML = `<p>${data.error}</p>`;
@@ -525,6 +531,85 @@
           }
         });
 
+        // --- Helper function to add current time indicator ---
+        function addCurrentTimeIndicator(plotData, cityTimezone) {
+          const now = new Date();
+
+          // Check if 'now' is within the forecast time range
+          // plotData.data is an array of traces; get x values from first trace
+          if (
+            !plotData.data ||
+            plotData.data.length === 0 ||
+            !plotData.data[0].x
+          ) {
+            return; // No data to check against
+          }
+
+          const xValues = plotData.data[0].x;
+          const firstTime = new Date(xValues[0]);
+          const lastTime = new Date(xValues[xValues.length - 1]);
+
+          // Only add indicator if current time is within forecast range
+          if (now < firstTime || now > lastTime) {
+            console.log(`Current time is outside forecast range`);
+            return;
+          }
+
+          // Convert user's current time to city's timezone
+          // "sv-SE" locale gives YYYY-MM-DD HH:mm:ss format
+          const cityLocalString = now.toLocaleString("sv-SE", {
+            timeZone: cityTimezone,
+          });
+          const plotlyDatetime = cityLocalString.replace(" ", "T");
+
+          // Initialize shapes array if it doesn't exist
+          if (!plotData.layout.shapes) {
+            plotData.layout.shapes = [];
+          }
+
+          // Add vertical line at current time
+          plotData.layout.shapes.push({
+            type: "line",
+            xref: "x",
+            yref: "paper", // spans full height of plot
+            x0: plotlyDatetime,
+            x1: plotlyDatetime,
+            y0: 0,
+            y1: 1,
+            line: {
+              color: "rgba(100, 100, 100, 0.6)",
+              width: 2,
+              dash: "dash",
+            },
+            layer: "above",
+          });
+
+          // Initialize annotations array if it doesn't exist
+          if (!plotData.layout.annotations) {
+            plotData.layout.annotations = [];
+          }
+
+          // Add "Now" label at the top of the line
+          plotData.layout.annotations.push({
+            x: plotlyDatetime,
+            y: 1,
+            xref: "x",
+            yref: "paper",
+            text: "Now",
+            showarrow: false,
+            font: {
+              color: "rgba(100, 100, 100, 0.8)",
+              size: 12,
+            },
+            xanchor: "center",
+            yanchor: "bottom",
+          });
+
+          console.log(
+            `Added current time indicator at ${plotlyDatetime} (${cityTimezone})`,
+          );
+        }
+
         // --- Modal/Lightbox functionality ---
         const modal = document.getElementById("plot-modal");
         const modalPlotContainer = document.getElementById(
@@ -535,11 +620,14 @@
 
         let currentModalPlotData = null;
 
-        function openModal(plotData) {
+        function openModal(plotData, cityTimezone) {
           currentModalPlotData = plotData;
           modal.classList.add("open");
           modal.setAttribute("aria-hidden", "false");
           document.body.style.overflow = "hidden"; // prevent background scroll
+
+          // Add current time indicator if within forecast range
+          addCurrentTimeIndicator(plotData, cityTimezone);
 
           // Re-render plot at larger size
           Plotly.newPlot(modalPlotContainer, plotData.data, plotData.layout, {

@@ -44,18 +44,18 @@ _db_config = None
 def _get_db_config() -> dict:
     """
     Get database configuration from environment variables (lazy initialization).
-    
+
     Returns:
         dict: Database connection parameters
-        
+
     Raises:
         ValueError: If required environment variables are missing or contain unresolved Key Vault references
     """
     global _db_config
-    
+
     if _db_config is not None:
         return _db_config
-    
+
     # Read environment variables
     DATABASE_HOST = os.getenv("DATABASE_HOST")
     DATABASE_PORT = os.getenv("DATABASE_PORT", "5432")
@@ -63,20 +63,24 @@ def _get_db_config() -> dict:
     DATABASE_USER = os.getenv("DATABASE_USER")
     DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD")
     DATABASE_SSLMODE = os.getenv("DATABASE_SSLMODE", "require")
-    
+
     # Validate required variables exist
     if not all([DATABASE_HOST, DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME]):
         missing = []
-        if not DATABASE_HOST: missing.append("DATABASE_HOST")
-        if not DATABASE_USER: missing.append("DATABASE_USER")
-        if not DATABASE_PASSWORD: missing.append("DATABASE_PASSWORD")
-        if not DATABASE_NAME: missing.append("DATABASE_NAME")
-        
+        if not DATABASE_HOST:
+            missing.append("DATABASE_HOST")
+        if not DATABASE_USER:
+            missing.append("DATABASE_USER")
+        if not DATABASE_PASSWORD:
+            missing.append("DATABASE_PASSWORD")
+        if not DATABASE_NAME:
+            missing.append("DATABASE_NAME")
+
         raise ValueError(
             f"Missing required database environment variables: {', '.join(missing)}. "
             "Ensure all database credentials are set in App Service configuration."
         )
-    
+
     # Check for unresolved Key Vault references (indicates Key Vault access issues)
     for var_name, var_value in [
         ("DATABASE_HOST", DATABASE_HOST),
@@ -89,13 +93,13 @@ def _get_db_config() -> dict:
                 "This usually means the App Service managed identity doesn't have Key Vault access yet. "
                 "Wait a few seconds and try again, or check Key Vault access policies."
             )
-    
+
     env_mode = os.getenv("ENV", "production")
     print(
         f"Database config loaded ({env_mode} mode): "
         f"{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME} (sslmode={DATABASE_SSLMODE})"
     )
-    
+
     _db_config = {
         "host": DATABASE_HOST,
         "port": DATABASE_PORT,
@@ -104,7 +108,7 @@ def _get_db_config() -> dict:
         "password": DATABASE_PASSWORD,
         "sslmode": DATABASE_SSLMODE,
     }
-    
+
     return _db_config
 
 
@@ -119,7 +123,7 @@ def get_database_url() -> str:
         postgresql://user:pass@host:5432/dbname?sslmode=require
     """
     config = _get_db_config()
-    
+
     return (
         f"postgresql://{config['user']}:{config['password']}"
         f"@{config['host']}:{config['port']}/{config['dbname']}"
@@ -135,7 +139,7 @@ def get_sync_connection():
     import psycopg
 
     config = _get_db_config()
-    
+
     conn = psycopg.connect(
         host=config["host"],
         port=config["port"],
@@ -191,7 +195,7 @@ def search_cities(query: str, limit: int = 10) -> list[dict]:
         return []
 
 
-def lookup_city_coordinates(city_name: str) -> tuple[float, float, str] | None:
+def lookup_city_coordinates(city_name: str) -> tuple[float, float, str, str] | None:
     """
     Look up pollen grid coordinates and timezone for a city by name (case-insensitive).
 
@@ -199,9 +203,10 @@ def lookup_city_coordinates(city_name: str) -> tuple[float, float, str] | None:
         city_name: City name to search for (exact match, case-insensitive)
 
     Returns:
-        Tuple of (latitude, longitude, timezone) for the highest population match,
+        Tuple of (latitude, longitude, timezone, canonical_city_name) for the highest population match,
         or None if city not found. Timezone is an IANA timezone string (e.g., "America/New_York")
         or "UTC" if timezone is not available in the database.
+        canonical_city_name is the properly capitalized name from the database.
 
     Note:
         Uses pollen_latitude and pollen_longitude which are snapped to
@@ -216,7 +221,7 @@ def lookup_city_coordinates(city_name: str) -> tuple[float, float, str] | None:
             # Order by population DESC to get highest population city
             cur.execute(
                 """
-                SELECT pollen_latitude, pollen_longitude, timezone
+                SELECT pollen_latitude, pollen_longitude, timezone, name
                 FROM public.cities
                 WHERE LOWER(name) = LOWER(%s) OR LOWER(ascii_name) = LOWER(%s)
                 ORDER BY population DESC NULLS LAST
@@ -229,7 +234,8 @@ def lookup_city_coordinates(city_name: str) -> tuple[float, float, str] | None:
 
             if result:
                 timezone = result[2] if result[2] else "UTC"
-                return (float(result[0]), float(result[1]), timezone)
+                canonical_name = result[3] if result[3] else city_name
+                return (float(result[0]), float(result[1]), timezone, canonical_name)
             return None
 
     except Exception as e:

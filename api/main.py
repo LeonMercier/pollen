@@ -115,8 +115,8 @@ async def api_plot(city: str | None = None):
     if not result:
         return {"success": False, "error": f"City '{city}' not found"}
 
-    # Unpack coordinates and timezone
-    lat, lon, timezone_name = result
+    # Unpack coordinates, timezone, and canonical city name
+    lat, lon, timezone_name, canonical_city_name = result
 
     try:
         fig = plot(lat, lon, timezone_name)  # Pass timezone to plot function
@@ -127,9 +127,10 @@ async def api_plot(city: str | None = None):
 
         return {
             "success": True,
-            "city": city,
+            "city": canonical_city_name,
             "lat": lat,
             "lon": lon,
+            "timezone": timezone_name,
             "plotly_data": fig_data["data"],
             "plotly_layout": fig_data["layout"],
             "plotly_config": {"responsive": True},
@@ -159,9 +160,9 @@ async def api_plots(city: str | None = None):
     if not result:
         return {"success": False, "error": f"City '{city}' not found"}
 
-    lat, lon, timezone_name = result
+    lat, lon, timezone_name, canonical_city_name = result
     try:
-        figures = plot_by_type(lat, lon, timezone_name)
+        figures = plot_by_type(lat, lon, timezone_name, canonical_city_name)
 
         plots = {}
         for display_name, fig in figures.items():
@@ -174,9 +175,10 @@ async def api_plots(city: str | None = None):
 
         return {
             "success": True,
-            "city": city,
+            "city": canonical_city_name,
             "lat": lat,
             "lon": lon,
+            "timezone": timezone_name,
             "plots": plots,
         }
     except Exception as e:

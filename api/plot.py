@@ -1,5 +1,6 @@
 import plotly.express as px
 import pandas as pd
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 # local
@@ -33,6 +34,40 @@ _BAND_COLORS = [
     "rgba(255, 130,  0,   0.18)",  # High      — orange
     "rgba(220,  30,  30,  0.20)",  # Very High — red
 ]
+
+
+def _get_utc_offset_string(timezone_name: str) -> str:
+    """
+    Get UTC offset string for a timezone (e.g., "UTC+2", "UTC-5").
+
+    Args:
+        timezone_name: IANA timezone name (e.g., "Europe/Helsinki")
+
+    Returns:
+        String like "UTC+2" or "UTC-5"
+
+    Note:
+        This function returns integer hour offsets only. Timezones with
+        half-hour or quarter-hour offsets (e.g., Asia/Kolkata UTC+5:30,
+        Australia/Eucla UTC+8:45) will be rounded to the nearest hour.
+        For more precision, modify to include minutes in the format.
+    """
+    # Get current time in the timezone to determine offset
+    # (offset can change due to DST, so we use current time)
+    now = datetime.now(ZoneInfo(timezone_name))
+    offset = now.utcoffset()
+
+    # Handle edge case where utcoffset() returns None
+    if offset is None:
+        return "unknown"
+
+    offset_seconds = offset.total_seconds()
+    offset_hours = int(offset_seconds / 3600)
+
+    if offset_hours >= 0:
+        return f"UTC+{offset_hours}"
+    else:
+        return f"UTC{offset_hours}"  # negative sign included
 
 
 def _add_severity_bands(fig, constituent_type: str) -> None:
@@ -179,7 +214,7 @@ def plot(latitude, longitude, timezone_name: str):
     return fig
 
 
-def plot_by_type(latitude, longitude, timezone_name: str) -> dict:
+def plot_by_type(latitude, longitude, timezone_name: str, city_name: str) -> dict:
     """
     Return a dict of Plotly figures, one per pollen type, keyed by display name.
 
@@ -187,6 +222,7 @@ def plot_by_type(latitude, longitude, timezone_name: str) -> dict:
         latitude: Latitude of the location
         longitude: Longitude of the location
         timezone_name: IANA timezone name for x-axis labels
+        city_name: City name to display on x-axis label
     """
     # SQL injection guard
     lat = float(latitude)
@@ -196,6 +232,10 @@ def plot_by_type(latitude, longitude, timezone_name: str) -> dict:
 
     # y-axis upper bound (log10 units); must match update_layout range below
     LOG_Y_MAX = 3
+
+    # Calculate UTC offset for the x-axis label
+    utc_offset = _get_utc_offset_string(timezone_name)
+    x_axis_label = f"{city_name} Local Time ({utc_offset})"
 
     figures = {}
     for constituent_type, group_df in df.groupby("constituent_type"):
@@ -207,7 +247,7 @@ def plot_by_type(latitude, longitude, timezone_name: str) -> dict:
             title=display_name,
             # markers=True,
             labels=dict(
-                forecast_datetime="Local Time",
+                forecast_datetime=x_axis_label,
                 constituent_value="Pollen grains / m³",
             ),
         )
