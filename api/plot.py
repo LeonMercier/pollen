@@ -6,12 +6,12 @@ from zoneinfo import ZoneInfo
 from database import *
 
 CONSTITUENT_DISPLAY_NAMES = {
-    "Alnus": "Alder (Alnus)",
-    "Betula": "Birch (Betula)",
-    "Poaceae": "Grass (Poaceae)",
-    "Ambrosia": "Ragweed (Ambrosia)",
-    "Artemisia": "Mugwort (Artemisia)",
-    "64002": "Olive (Olea)",
+    "Alnus": "Alder / Leppä",
+    "Betula": "Birch / Koivu",
+    "Poaceae": "Grasses / Heinät",
+    "Ambrosia": "Ragweed / Tuoksukki",
+    "Artemisia": "Mugwort / Pujo",
+    "64002": "Olive / Oliivi",
 }
 
 # Per-species pollen severity thresholds in grains/m³.

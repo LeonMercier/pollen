@@ -3,6 +3,8 @@ import os
 import shutil
 from datetime import datetime, timezone
 
+from shared.config import get_cdsapi_area
+
 # NOTE: the full forecast is guaranteed to be available daily at 10:00 UTC (but "time" in request should always be 00:00)
 
 # Retrieve secrets from Databricks-managed secret scope
@@ -130,8 +132,8 @@ request = {
         "96",
     ],
     "data_format": "grib",
-    # empty area downloads entire thing
-    "area": [70, 10, 58, 31],
+    # Bounding box from shared configuration (ensures consistency with geocoding)
+    "area": get_cdsapi_area(),
 }
 ####################################################
 

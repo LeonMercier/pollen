@@ -302,6 +302,31 @@ resource "databricks_workspace_file" "init_script" {
 }
 
 # ========================================
+# SECTION 7.6: Shared Python Module
+# ========================================
+
+# Upload shared module package marker
+resource "databricks_workspace_file" "shared_init" {
+  source = "${path.module}/../../notebooks/shared/__init__.py"
+  path   = "/Workspace/notebooks/shared/__init__.py"
+
+  depends_on = [
+    azurerm_role_assignment.adf_databricks
+  ]
+}
+
+# Upload shared configuration module
+# Contains geographic bounding box constants used by extract.py and geocode.py
+resource "databricks_workspace_file" "shared_config" {
+  source = "${path.module}/../../notebooks/shared/config.py"
+  path   = "/Workspace/notebooks/shared/config.py"
+
+  depends_on = [
+    azurerm_role_assignment.adf_databricks
+  ]
+}
+
+# ========================================
 # SECTION 8: Databricks Notebooks
 # ========================================
 
@@ -310,10 +335,11 @@ resource "databricks_notebook" "extract" {
   source = "${path.module}/../../notebooks/extract.py"
   path   = "/Workspace/notebooks/extract"
 
-  # Ensure workspace and permissions are ready
+  # Ensure workspace and permissions are ready, and shared module is uploaded
   depends_on = [
     azurerm_role_assignment.adf_databricks,
-    databricks_secret_scope.secrets
+    databricks_secret_scope.secrets,
+    databricks_workspace_file.shared_config
   ]
 }
 
@@ -357,7 +383,8 @@ resource "databricks_notebook" "geocode" {
 
   depends_on = [
     azurerm_role_assignment.adf_databricks,
-    databricks_secret_scope.secrets
+    databricks_secret_scope.secrets,
+    databricks_workspace_file.shared_config
   ]
 }
 
@@ -536,6 +563,42 @@ resource "azurerm_data_factory_pipeline" "etl" {
     databricks_notebook.transform,
     databricks_notebook.load,
     databricks_notebook.plot
+  ]
+}
+
+# 9.5: Pipeline - Geocode Workflow (standalone)
+# This pipeline loads city geocoding data from GeoNames into PostgreSQL
+# Run manually as needed (cities data is relatively static)
+resource "azurerm_data_factory_pipeline" "geocode" {
+  name            = "pipeline-geocode"
+  data_factory_id = azurerm_data_factory.adf.id
+
+  activities_json = jsonencode([
+    {
+      name = "Geocode"
+      type = "DatabricksNotebook"
+
+      dependsOn = []
+
+      typeProperties = {
+        notebookPath = databricks_notebook.geocode.path
+
+        baseParameters = {
+          geonames_url = "https://download.geonames.org/export/dump/cities500.zip"
+          output_mode  = "replace"
+        }
+      }
+
+      linkedServiceName = {
+        referenceName = azurerm_data_factory_linked_service_azure_databricks.dbw.name
+        type          = "LinkedServiceReference"
+      }
+    }
+  ])
+
+  depends_on = [
+    azurerm_data_factory_linked_service_azure_databricks.dbw,
+    databricks_notebook.geocode
   ]
 }
 

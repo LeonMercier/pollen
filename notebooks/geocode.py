@@ -46,6 +46,8 @@ import urllib.request
 import zipfile
 import os
 
+from shared.config import GRID_NORTH, GRID_SOUTH, GRID_WEST, GRID_EAST
+
 # COMMAND ----------
 
 # European country codes (47 countries)
@@ -103,10 +105,9 @@ EUROPE_COUNTRIES = [
     "XK",
 ]
 
-GRID_WEST = -25.0
-GRID_EAST = 45.0
-GRID_SOUTH = 30.0
-GRID_NORTH = 72.0
+# Bounding box imported from shared configuration
+# This ensures geographic consistency with the extract.py CDSAPI request
+# GRID_NORTH, GRID_SOUTH, GRID_WEST, GRID_EAST are imported above
 
 # COMMAND ----------
 
