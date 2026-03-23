@@ -41,3 +41,8 @@ variable "database_sslmode" {
   type        = string
   default     = "require"
 }
+
+variable "app_service_sku_name" {
+  description = "SKU for the App Service Plan (e.g., F1 for Free, B1 for Basic, S1 for Standard)"
+  type        = string
+}
