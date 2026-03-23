@@ -7,18 +7,58 @@ The frontend is served as a static file hosted separately (frontend/index.html).
 
 import json
 import os
+import sys
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
 # local modules
 from database import lookup_city_coordinates, search_cities
 from plot import plot, plot_by_type
 
+# Startup logging
+print("=" * 60)
+print("Pollen ETL API - Starting up")
+print(f"Python version: {sys.version}")
+print(f"Working directory: {os.getcwd()}")
+print(f"ENV mode: {os.getenv('ENV', 'production')}")
+print(f"ALLOWED_ORIGINS: {os.getenv('ALLOWED_ORIGINS', '(not set)')}")
+print("=" * 60)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Startup event to validate database configuration.
+    Logs configuration but doesn't fail if database is unreachable
+    (allows app to start even if DB is temporarily down).
+    The first part of the function, before the yield, will be executed before the application starts.
+    And the part after the yield will be executed after the application has finished.
+    """
+    print("Running startup checks...")
+    try:
+        from database import _get_db_config
+
+        config = _get_db_config()
+        print(f"✓ Database configuration loaded successfully")
+        print(f"  Host: {config['host']}")
+        print(f"  Database: {config['dbname']}")
+        print(f"  SSL Mode: {config['sslmode']}")
+    except Exception as e:
+        print(f"✗ Database configuration error: {e}")
+        print("  App will continue but database queries will fail")
+
+    print("Startup checks complete")
+    print("=" * 60)
+    yield
+
+
 app = FastAPI(
     title="Pollen ETL API",
     description="API for Pollen ETL data pipeline",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Allow the static frontend (Azure Blob Storage or localhost) to call this API.
@@ -28,6 +68,8 @@ _allowed_origins = os.environ.get("ALLOWED_ORIGINS", "")
 # List comprehension
 # split comma separated list, strip whitespace and empty strings
 origins = [o.strip() for o in _allowed_origins.split(",") if o.strip()]
+
+print(f"CORS origins configured: {origins}")
 
 app.add_middleware(
     CORSMiddleware,

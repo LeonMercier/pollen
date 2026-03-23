@@ -4,6 +4,9 @@ Database connection configuration for PostgreSQL.
 Supports two modes:
 - Production/Azure: Environment variables from Azure Key Vault via App Service
 - Local development: Environment variables from .env.local when ENV=local
+
+Uses lazy initialization to avoid startup failures if Key Vault references
+haven't resolved yet.
 """
 
 import os
@@ -31,16 +34,78 @@ def load_local_env():
 
 
 # Load local env if applicable
-# Runs on module import and saves to module variables below
+# Runs on module import
 load_local_env()
 
-# Database connection parameters from environment variables
-DATABASE_HOST = os.getenv("DATABASE_HOST")
-DATABASE_PORT = os.getenv("DATABASE_PORT", "5432")
-DATABASE_NAME = os.getenv("DATABASE_NAME")
-DATABASE_USER = os.getenv("DATABASE_USER")
-DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD")
-DATABASE_SSLMODE = os.getenv("DATABASE_SSLMODE", "require")
+# Cache for database configuration (lazy initialization)
+_db_config = None
+
+
+def _get_db_config() -> dict:
+    """
+    Get database configuration from environment variables (lazy initialization).
+    
+    Returns:
+        dict: Database connection parameters
+        
+    Raises:
+        ValueError: If required environment variables are missing or contain unresolved Key Vault references
+    """
+    global _db_config
+    
+    if _db_config is not None:
+        return _db_config
+    
+    # Read environment variables
+    DATABASE_HOST = os.getenv("DATABASE_HOST")
+    DATABASE_PORT = os.getenv("DATABASE_PORT", "5432")
+    DATABASE_NAME = os.getenv("DATABASE_NAME")
+    DATABASE_USER = os.getenv("DATABASE_USER")
+    DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD")
+    DATABASE_SSLMODE = os.getenv("DATABASE_SSLMODE", "require")
+    
+    # Validate required variables exist
+    if not all([DATABASE_HOST, DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME]):
+        missing = []
+        if not DATABASE_HOST: missing.append("DATABASE_HOST")
+        if not DATABASE_USER: missing.append("DATABASE_USER")
+        if not DATABASE_PASSWORD: missing.append("DATABASE_PASSWORD")
+        if not DATABASE_NAME: missing.append("DATABASE_NAME")
+        
+        raise ValueError(
+            f"Missing required database environment variables: {', '.join(missing)}. "
+            "Ensure all database credentials are set in App Service configuration."
+        )
+    
+    # Check for unresolved Key Vault references (indicates Key Vault access issues)
+    for var_name, var_value in [
+        ("DATABASE_HOST", DATABASE_HOST),
+        ("DATABASE_USER", DATABASE_USER),
+        ("DATABASE_PASSWORD", DATABASE_PASSWORD),
+    ]:
+        if var_value and "@Microsoft.KeyVault" in var_value:
+            raise ValueError(
+                f"{var_name} contains unresolved Key Vault reference: {var_value[:50]}... "
+                "This usually means the App Service managed identity doesn't have Key Vault access yet. "
+                "Wait a few seconds and try again, or check Key Vault access policies."
+            )
+    
+    env_mode = os.getenv("ENV", "production")
+    print(
+        f"Database config loaded ({env_mode} mode): "
+        f"{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME} (sslmode={DATABASE_SSLMODE})"
+    )
+    
+    _db_config = {
+        "host": DATABASE_HOST,
+        "port": DATABASE_PORT,
+        "dbname": DATABASE_NAME,
+        "user": DATABASE_USER,
+        "password": DATABASE_PASSWORD,
+        "sslmode": DATABASE_SSLMODE,
+    }
+    
+    return _db_config
 
 
 def get_database_url() -> str:
@@ -53,23 +118,12 @@ def get_database_url() -> str:
     Example:
         postgresql://user:pass@host:5432/dbname?sslmode=require
     """
-    if not all([DATABASE_HOST, DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME]):
-        raise ValueError(
-            "Missing required database environment variables. "
-            "Ensure DATABASE_HOST, DATABASE_USER, DATABASE_PASSWORD, "
-            "and DATABASE_NAME are set."
-        )
-
-    env_mode = os.getenv("ENV", "production")
-    print(
-        f"Connecting to PostgreSQL ({env_mode} mode): "
-        f"{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
-    )
-
+    config = _get_db_config()
+    
     return (
-        f"postgresql://{DATABASE_USER}:{DATABASE_PASSWORD}"
-        f"@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
-        f"?sslmode={DATABASE_SSLMODE}"
+        f"postgresql://{config['user']}:{config['password']}"
+        f"@{config['host']}:{config['port']}/{config['dbname']}"
+        f"?sslmode={config['sslmode']}"
     )
 
 
@@ -80,13 +134,15 @@ def get_sync_connection():
     """
     import psycopg
 
+    config = _get_db_config()
+    
     conn = psycopg.connect(
-        host=DATABASE_HOST,
-        port=DATABASE_PORT,
-        dbname=DATABASE_NAME,
-        user=DATABASE_USER,
-        password=DATABASE_PASSWORD,
-        sslmode=DATABASE_SSLMODE,
+        host=config["host"],
+        port=config["port"],
+        dbname=config["dbname"],
+        user=config["user"],
+        password=config["password"],
+        sslmode=config["sslmode"],
     )
     return conn
 
