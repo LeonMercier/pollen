@@ -67,6 +67,7 @@ variable "app_service_sku_name" {
   default     = "F1"
 }
 
+# check available version strings here: https://github.com/microsoft/Oryx/blob/main/platforms/python/versions/bullseye/versionsToBuild.txt
 variable "python_runtime_version" {
   description = "Python runtime version for App Service"
   type        = string

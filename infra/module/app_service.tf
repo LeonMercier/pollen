@@ -23,6 +23,8 @@ resource "azurerm_linux_web_app" "api" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   service_plan_id     = azurerm_service_plan.api[0].id
+  # create in enabled state but immediately stop with the resource below
+  enabled = true
 
   # Enable system-assigned managed identity for Key Vault access
   identity {
@@ -72,18 +74,7 @@ resource "azurerm_linux_web_app" "api" {
     "ALLOWED_ORIGINS" = trimsuffix(azurerm_storage_account.web.primary_web_endpoint, "/")
   }
 
-  # ZIP deployment configuration
-  # Terraform will package and deploy the ./api directory
-  # zip_deploy_file = data.archive_file.api_code.output_path
-
   tags = azurerm_resource_group.rg.tags
-
-  # Lifecycle rule
-  # lifecycle {
-  #   ignore_changes = [
-  #     zip_deploy_file # Ignore changes to deployment package hash
-  #   ]
-  # }
 
   # Ensure Key Vault secrets and access policy are created before App Service app_settings reference them
   depends_on = [
@@ -91,6 +82,21 @@ resource "azurerm_linux_web_app" "api" {
     azurerm_key_vault_secret.postgres_username,
     azurerm_key_vault_secret.postgres_password
   ]
+}
+
+# Stop the app immediately after creation so it doesn't consume quota
+resource "null_resource" "stop_api_after_create" {
+  count = var.enable_app_service ? 1 : 0
+
+  triggers = {
+    app_id = azurerm_linux_web_app.api[0].id
+  }
+
+  provisioner "local-exec" {
+    command = "az webapp stop --name ${azurerm_linux_web_app.api[0].name} --resource-group ${azurerm_linux_web_app.api[0].resource_group_name}"
+  }
+
+  depends_on = [azurerm_linux_web_app.api]
 }
 
 # 11.2.1: Key Vault access policy for App Service managed identity
@@ -110,14 +116,4 @@ resource "azurerm_key_vault_access_policy" "app_service" {
     azurerm_linux_web_app.api,
     azurerm_key_vault_access_policy.user
   ]
-}
-
-# 11.3: Archive API code for deployment
-# This packages the ./api directory into a zip file
-data "archive_file" "api_code" {
-  count = var.enable_app_service ? 1 : 0
-
-  type        = "zip"
-  source_dir  = "${path.module}/../../api"
-  output_path = "${path.module}/.terraform/api-deploy.zip"
 }

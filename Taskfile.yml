@@ -125,6 +125,7 @@ tasks:
   # Deployment
   # ========================================
 
+  # TODO: add checks for finished deployment and finished 'webapp start'
   remote:deployapi:dev:
     desc: Deploy api code to Azure App Service (dev)
     vars:
@@ -134,9 +135,36 @@ tasks:
       RG_NAME:
         sh: cd {{.TF_DIR}} && terraform output -raw resource_group_name
     cmds:
-      - cd ./api && zip -r ../api-deploy.zip .
-      - az webapp deploy --restart true --type zip --name {{.APP_NAME}} --resource-group {{.RG_NAME}} --src-path ./api-deploy.zip
-      - rm api-deploy.zip
+      # Zip from api dir, exclude junk
+      - cd ./api && zip -r ../api-deploy.zip . -x "*__pycache__*" -x "*.pyc" -x "*.pyo"
+
+      # Deploy (blocks until Oryx build completes)
+      - az webapp deploy
+        --async false
+        --clean true
+        --name {{.APP_NAME}}
+        --resource-group {{.RG_NAME}}
+        --restart false
+        --src-path ./api-deploy.zip
+        --timeout 600
+        --track-status false
+
+      - rm ./api-deploy.zip
+
+      # Verify the deployment actually succeeded before starting
+      - |
+        STATUS=$(az webapp log deployment list \
+          --name {{.APP_NAME}} \
+          --resource-group {{.RG_NAME}} \
+          --query "[0].status" -o tsv)
+        echo "Deployment status: $STATUS"
+        if [ "$STATUS" != "4" ] && [ "$STATUS" != "Success" ]; then
+          echo "Deployment did not succeed (status: $STATUS), aborting start"
+          exit 1
+        fi
+
+      # Only start if deployment succeeded
+      - az webapp start --name {{.APP_NAME}} --resource-group {{.RG_NAME}}
 
   remote:deployapi:prod:
     desc: Deploy api code to Azure App Service (prod)
@@ -147,9 +175,36 @@ tasks:
       RG_NAME:
         sh: cd {{.TF_DIR}} && terraform output -raw resource_group_name
     cmds:
-      - zip -r api-deploy.zip ./api
-      - az webapp deployment source config-zip --name {{.APP_NAME}} --resource-group {{.RG_NAME}} --src ./api-deploy.zip
-      - rm api-deploy.zip
+      # Zip from api dir, exclude junk
+      - cd ./api && zip -r ../api-deploy.zip . -x "*__pycache__*" -x "*.pyc" -x "*.pyo"
+
+      # Deploy (blocks until Oryx build completes)
+      - az webapp deploy
+        --async false
+        --clean true
+        --name {{.APP_NAME}}
+        --resource-group {{.RG_NAME}}
+        --restart false
+        --src-path ./api-deploy.zip
+        --timeout 600
+        --track-status false
+
+      - rm ./api-deploy.zip
+
+      # Verify the deployment actually succeeded before starting
+      - |
+        STATUS=$(az webapp log deployment list \
+          --name {{.APP_NAME}} \
+          --resource-group {{.RG_NAME}} \
+          --query "[0].status" -o tsv)
+        echo "Deployment status: $STATUS"
+        if [ "$STATUS" != "4" ] && [ "$STATUS" != "Success" ]; then
+          echo "Deployment did not succeed (status: $STATUS), aborting start"
+          exit 1
+        fi
+
+      # Only start if deployment succeeded
+      - az webapp start --name {{.APP_NAME}} --resource-group {{.RG_NAME}}
 
   remote:deployfrontend:dev:
     desc: Deploy frontend to Azure Blob Storage static website (dev)
@@ -180,6 +235,12 @@ tasks:
       STORAGE_ACCOUNT:
         sh: cd {{.TF_DIR}} && terraform output -raw web_storage_account_name
     cmds:
+      - |
+        if [ -z "{{.API_URL}}" ]; then
+          echo "Error: App Service is not enabled."
+          echo "Set enable_app_service = true in infra/environments/prod/terraform.tfvars and run terraform apply first."
+          exit 1
+        fi
       - sed 's|%%API_BASE_URL%%|{{.API_URL}}|g' frontend/index.html > /tmp/pollen-index.html
       - az storage blob upload --account-name {{.STORAGE_ACCOUNT}} --auth-mode login --container-name '$web' --file /tmp/pollen-index.html --name index.html --overwrite
       - rm /tmp/pollen-index.html

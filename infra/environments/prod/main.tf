@@ -56,4 +56,5 @@ module "pollen" {
   web_storage_suffix      = "prod" # Stable URL for production website
   database_sslmode        = var.database_sslmode
   app_service_sku_name    = var.app_service_sku_name
+  enable_app_service      = var.enable_app_service
 }

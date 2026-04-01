@@ -42,6 +42,12 @@ variable "database_sslmode" {
   default     = "require"
 }
 
+variable "enable_app_service" {
+  description = "Deploy the App Service and frontend stack (false = ETL-only)"
+  type        = bool
+  default     = true
+}
+
 variable "app_service_sku_name" {
   description = "SKU for the App Service Plan (e.g., F1 for Free, B1 for Basic, S1 for Standard)"
   type        = string

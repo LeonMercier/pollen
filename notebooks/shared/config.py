@@ -8,12 +8,12 @@ Coordinate system: WGS84 decimal degrees
 Area covered: Scandinavia and Central Europe
 """
 
-# Bounding box for European pollen forecast data
-# Based on CAMS Europe Air Quality Forecasts coverage area
-GRID_NORTH = 70.0  # Northern limit (Northern Scandinavia)
-GRID_SOUTH = 58.0  # Southern limit (Denmark/Northern Germany)
-GRID_WEST = 10.0   # Western limit (Note: positive value = east of Prime Meridian)
-GRID_EAST = 31.0   # Eastern limit (Poland/Eastern Europe)
+# CAMS data covers all of Europe excluding Canary islands and Azores but including Iceland
+# Here we limit to a box including Finland, Sweden and the Baltic countries
+GRID_NORTH = 70.05  # northernmost of Finland
+GRID_SOUTH = 53.0  # southernmost of Lithuania
+GRID_WEST = 10.0  # westernmost of Sweden
+GRID_EAST = 31.4  # easternmost of  Finland
 
 
 def get_cdsapi_area():
@@ -54,6 +54,4 @@ def validate_point_in_bounds(lat, lon):
     Returns:
         bool: True if point is within bounds, False otherwise
     """
-    return (
-        GRID_SOUTH <= lat <= GRID_NORTH and GRID_WEST <= lon <= GRID_EAST
-    )
+    return GRID_SOUTH <= lat <= GRID_NORTH and GRID_WEST <= lon <= GRID_EAST
