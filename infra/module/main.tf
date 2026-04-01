@@ -195,7 +195,8 @@ resource "azurerm_postgresql_flexible_server" "postgres" {
 
   sku_name   = var.postgres_sku_name
   version    = "17"
-  storage_mb = 65536 # 32 GB minimum
+  # one of (MB): 32768 65536 131072 262144 524288 1048576 2097152 4193280 4194304 8388608 16777216 33553408
+  storage_mb = 32768 # 32 GB 
 
   backup_retention_days        = 7
   geo_redundant_backup_enabled = false
