@@ -7,8 +7,8 @@
 --   1. Load new data into pollen_forecast_staging table
 --   2. Build indexes on staging table (production stays fast)
 --   3. Validate staging data (constituent count, row count)
---   4. Atomically swap: staging → production (millisecond operation)
---   5. Drop old production table
+--   4. Atomically swap: staging → production (including indexes)
+--   5. Drop old production table and indexes
 -- This ensures the API always has access to complete, indexed data.
 --
 -- LOCAL DEVELOPMENT:
@@ -25,12 +25,6 @@ CREATE TABLE IF NOT EXISTS public.pollen_forecast (
     constituent_value DOUBLE PRECISION NOT NULL,
     forecast_time INT NOT NULL
 );
-
-CREATE INDEX IF NOT EXISTS idx_forecast_time 
-    ON public.pollen_forecast(forecast_time DESC);
-
-CREATE INDEX IF NOT EXISTS idx_constituent 
-    ON public.pollen_forecast(constituent_type);
 
 CREATE INDEX IF NOT EXISTS idx_location 
     ON public.pollen_forecast(latitude, longitude);
