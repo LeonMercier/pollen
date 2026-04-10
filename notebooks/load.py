@@ -52,11 +52,8 @@ CREATE TABLE IF NOT EXISTS public.pollen_forecast (
 """
 
 # Index definitions (template used for both production and staging)
-create_indexes_template = """
-CREATE INDEX IF NOT EXISTS idx_forecast_time{suffix} 
-    ON public.pollen_forecast{suffix}(forecast_time DESC);
-CREATE INDEX IF NOT EXISTS idx_constituent{suffix} 
-    ON public.pollen_forecast{suffix}(constituent_type);
+# Note: Index names must be unique schema-wide, so we use {suffix}
+create_indexes_sql = """
 CREATE INDEX IF NOT EXISTS idx_location{suffix} 
     ON public.pollen_forecast{suffix}(latitude, longitude);
 """
@@ -72,18 +69,22 @@ CREATE TABLE public.pollen_forecast_staging (
 # Table swap SQL (atomic operation in transaction)
 swap_tables_sql = """
 BEGIN;
-    -- Rename current production table to _old
-    ALTER TABLE IF EXISTS public.pollen_forecast 
-        RENAME TO pollen_forecast_old;
+    -- Drop tables from previous run (this will drop indices too)
+    DROP TABLE IF EXISTS public.pollen_forecast_old CASCADE;
+
+    -- Rename current production table/indexes to _old
+    ALTER TABLE IF EXISTS public.pollen_forecast RENAME TO pollen_forecast_old;
+    ALTER INDEX IF EXISTS public.idx_location RENAME TO idx_location_old;
     
     -- Promote staging to production (atomic!)
-    ALTER TABLE public.pollen_forecast_staging 
-        RENAME TO pollen_forecast;
-COMMIT;
+    ALTER TABLE public.pollen_forecast_staging RENAME TO pollen_forecast;
+    ALTER INDEX public.idx_location_staging RENAME TO idx_location;
 
--- Clean up old table after successful swap
-DROP TABLE IF EXISTS public.pollen_forecast_old CASCADE;
+    -- Drop table after successful swap
+    DROP TABLE IF EXISTS public.pollen_forecast_old CASCADE;
+COMMIT;
 """
+
 
 # execute database creation
 # The 'spark' object exists already because of the Databricks environment.
@@ -137,6 +138,7 @@ except Exception as e:
 # Use 2-6 partitions for better IOPS utilization on B1ms SKU
 current_partitions = df.rdd.getNumPartitions()
 partition_count = min(6, max(2, current_partitions))
+# Just using 2 now with the tiny SKU we have (ignoring the above)
 df = df.coalesce(2)
 print(f"Using {partition_count} partitions for parallel loading")
 
@@ -180,7 +182,7 @@ try:
     statement = connection.createStatement()
 
     # Use _staging suffix for staging table indexes
-    staging_indexes = create_indexes_template.format(suffix="_staging")
+    staging_indexes = create_indexes_sql.format(suffix="_staging")
     statement.execute(staging_indexes)
 
     connection.close()
