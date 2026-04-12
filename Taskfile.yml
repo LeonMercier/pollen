@@ -83,11 +83,11 @@ tasks:
       - echo "Auto-reload enabled - edit files to see changes"
       - cd {{.API_DIR}} && ENV=local uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
-  local:api:prod:
-    desc: Run FastAPI locally without reload (production-like)
-    cmds:
-      - echo "Starting FastAPI on http://localhost:8000 (production mode)..."
-      - cd {{.API_DIR}} && ENV=local uvicorn main:app --host 0.0.0.0 --port 8000
+  # local:api:prod:
+  #   desc: Run FastAPI locally without reload (production-like)
+  #   cmds:
+  #     - echo "Starting FastAPI on http://localhost:8000 (production mode)..."
+  #     - cd {{.API_DIR}} && ENV=local uvicorn main:app --host 0.0.0.0 --port 8000
 
   local:frontend:
     desc: Serve the frontend locally on http://localhost:3000 (API must be on http://localhost:8000)
@@ -96,6 +96,7 @@ tasks:
     cmds:
       - mkdir -p {{.SERVE_DIR}}
       - sed 's|%%API_BASE_URL%%|http://localhost:8000|g' frontend/index.html > {{.SERVE_DIR}}/index.html
+      - cp frontend/styles.css {{.SERVE_DIR}}/styles.css
       - echo "Frontend available at http://localhost:3000"
       - echo "Make sure the API is running (task local:api)"
       - python -m http.server 3000 --directory {{.SERVE_DIR}}

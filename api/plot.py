@@ -271,4 +271,14 @@ def plot_by_type(latitude, longitude, timezone_name: str, city_name: str) -> dic
         _add_severity_bands(fig, constituent_type)
         figures[display_name] = fig
 
+    # sort by activity, then name (by returning a tuple)
+    def _plot_sort_key(item):
+        display_name, fig = item
+        values = fig.data[0].y
+        # v > 1 because we replace 0's with 1's previously
+        has_activity = sum(v > 1 for v in values if v is not None) >= 10
+        return (0 if has_activity else 1, display_name)
+
+    figures = dict(sorted(figures.items(), key=_plot_sort_key))
+
     return figures
