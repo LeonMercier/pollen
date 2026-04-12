@@ -1,3 +1,4 @@
+import math
 import plotly.express as px
 import pandas as pd
 from datetime import datetime
@@ -230,9 +231,6 @@ def plot_by_type(latitude, longitude, timezone_name: str, city_name: str) -> dic
 
     df = _fetch_forecast_df(lat, lon, timezone_name)
 
-    # y-axis upper bound (log10 units); must match update_layout range below
-    LOG_Y_MAX = 3
-
     # Calculate UTC offset for the x-axis label
     utc_offset = _get_utc_offset_string(timezone_name)
     x_axis_label = f"{city_name} Local Time ({utc_offset})"
@@ -240,6 +238,11 @@ def plot_by_type(latitude, longitude, timezone_name: str, city_name: str) -> dic
     figures = {}
     for constituent_type, group_df in df.groupby("constituent_type"):
         display_name = CONSTITUENT_DISPLAY_NAMES.get(constituent_type, constituent_type)
+
+        # y-axis upper bound (log10 units)
+        max_val = group_df["constituent_value"].max()
+        LOG_Y_MAX = max(3, math.ceil(math.log10(max_val)) if max_val > 0 else 3)
+
         fig = px.line(
             group_df,
             x="forecast_datetime",
