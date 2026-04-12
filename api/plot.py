@@ -18,14 +18,18 @@ CONSTITUENT_DISPLAY_NAMES = {
 
 # Per-species pollen severity thresholds in grains/m³.
 # Each entry is [low, medium, high]; values above 'high' are Very High.
-# These are approximate values — TODO: calibrate against EAN/SILAM guidelines.
+# These are approximate values — TODO: calibrate against more sources
+# https://climate-adapt.eea.europa.eu/en/observatory/publications-data/analysis-data/cams-ground-level-pollen-forecast
+# Olive, Betula, Alnus, Artemisia: start - high: 10 - 100
+# Poaceae, Ambrosia: start - high: 3 - 50
+# Plus we have high x 2 = very high
 SEVERITY_THRESHOLDS = {
-    "Alnus": [10, 70, 200],
-    "Betula": [10, 70, 200],
-    "Poaceae": [10, 50, 200],
-    "Ambrosia": [10, 50, 200],
-    "Artemisia": [10, 50, 200],
-    "64002": [10, 100, 300],
+    "Alnus": [10, 100, 200],
+    "Betula": [10, 100, 200],
+    "Poaceae": [3, 50, 100],
+    "Ambrosia": [3, 50, 100],
+    "Artemisia": [10, 100, 200],
+    "64002": [10, 100, 200],
 }
 
 # Band colours (semi-transparent fills drawn behind the trace)
@@ -240,8 +244,16 @@ def plot_by_type(latitude, longitude, timezone_name: str, city_name: str) -> dic
         display_name = CONSTITUENT_DISPLAY_NAMES.get(constituent_type, constituent_type)
 
         # y-axis upper bound (log10 units)
+        # get from variable with hardcoded fallback
+        thresholds = SEVERITY_THRESHOLDS.get(constituent_type, [10, 100, 200])
+        # arbitrarily the highest threshold times 5
+        # NOTE: with math.ceil() to get a nice round value, all plots currently
+        # end up with the same default upper value
+        log_floor = math.ceil(math.log10(thresholds[-1] * 5))
         max_val = group_df["constituent_value"].max()
-        LOG_Y_MAX = max(3, math.ceil(math.log10(max_val)) if max_val > 0 else 3)
+        LOG_Y_MAX = max(
+            log_floor, math.ceil(math.log10(max_val)) if max_val > 0 else log_floor
+        )
 
         fig = px.line(
             group_df,
