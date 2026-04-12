@@ -71,7 +71,7 @@ resource "azurerm_linux_web_app" "api" {
 
     # CORS - allow requests from the static frontend hosted on Azure Blob Storage
     # remove trailing slash (azure returns with slash, browsers normalize requests to no slash)
-    "ALLOWED_ORIGINS" = trimsuffix(azurerm_storage_account.web.primary_web_endpoint, "/")
+    "ALLOWED_ORIGINS" = "http://www.pollencast.eu, ${trimsuffix(azurerm_storage_account.web.primary_web_endpoint, "/")}"
   }
 
   tags = azurerm_resource_group.rg.tags

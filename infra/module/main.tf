@@ -193,8 +193,8 @@ resource "azurerm_postgresql_flexible_server" "postgres" {
   administrator_password = random_password.postgres_admin.result
   # zone = "2" # if we want to pin the zone, the comment out the lifecycle block below
 
-  sku_name   = var.postgres_sku_name
-  version    = "17"
+  sku_name = var.postgres_sku_name
+  version  = "17"
   # one of (MB): 32768 65536 131072 262144 524288 1048576 2097152 4193280 4194304 8388608 16777216 33553408
   storage_mb = 32768 # 32 GB 
 
@@ -639,6 +639,14 @@ resource "azurerm_storage_account" "web" {
   location                 = azurerm_resource_group.rg.location
   account_tier             = "Standard"
   account_replication_type = "LRS" # Locally redundant storage (free tier)
+
+  # TODO:!!
+  https_traffic_only_enabled = false
+
+  custom_domain {
+    name          = "www.pollencast.eu"
+    use_subdomain = false
+  }
 
   tags = azurerm_resource_group.rg.tags
 }
