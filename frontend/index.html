@@ -421,8 +421,6 @@
           modal.setAttribute("aria-hidden", "false");
           document.body.style.overflow = "hidden";
 
-          addCurrentTimeIndicator(plotData, cityTimezone);
-
           Plotly.newPlot(modalPlotContainer, plotData.data, plotData.layout, {
             ...plotData.config,
             responsive: true,
