@@ -245,6 +245,29 @@ p {
   }
 }
 
+/* Time range toggle */
+.range-btn {
+  padding: 6px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+}
+
+.range-btn.active {
+  background: #fff;
+  color: #111;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+.range-btn:focus-visible {
+  outline: 2px solid #4a90e2;
+  outline-offset: -2px;
+}
+
 footer {
   margin-top: 2rem;
   padding-bottom: 2rem;

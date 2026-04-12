@@ -34,6 +34,38 @@
         <button type="submit">Search</button>
       </form>
 
+      <!-- Time range toggle (hidden until plots are loaded) -->
+      <div id="time-range-toggle" style="display: none; margin: 1rem 0">
+        <div
+          role="group"
+          aria-label="Forecast time range"
+          style="
+            display: inline-flex;
+            gap: 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            overflow: hidden;
+          "
+        >
+          <button
+            id="btn-24h"
+            type="button"
+            class="range-btn active"
+            aria-pressed="true"
+          >
+            24 hours
+          </button>
+          <button
+            id="btn-96h"
+            type="button"
+            class="range-btn"
+            aria-pressed="false"
+          >
+            96 hours
+          </button>
+        </div>
+      </div>
+
       <div id="status-message"></div>
       <div id="plots-grid"></div>
 
@@ -72,9 +104,6 @@
     </div>
 
     <script>
-      // API_BASE_URL is substituted at deploy time:
-      //   prod:  https://<app-service-hostname>
-      //   local: http://localhost:8000
       const API_BASE_URL = "%%API_BASE_URL%%";
 
       document.addEventListener("DOMContentLoaded", function () {
@@ -83,28 +112,76 @@
         const suggestions = document.getElementById("city-suggestions");
         const statusMessage = document.getElementById("status-message");
         const plotsGrid = document.getElementById("plots-grid");
+        const timeRangeToggle = document.getElementById("time-range-toggle");
+        const btn24h = document.getElementById("btn-24h");
+        const btn96h = document.getElementById("btn-96h");
+
+        // --- Time range state ---
+        let currentView = "24h"; // '24h' | '96h'
+
+        function applyTimeRange() {
+          const cells = plotsGrid.querySelectorAll(".plot-cell");
+          if (!cells.length) return;
+
+          let xRange;
+          if (currentView === "24h") {
+            const start = new Date();
+            const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+            xRange = [start.toISOString(), end.toISOString()];
+          } else {
+            // Restore auto-range so Plotly shows full extent of the data
+            xRange = null;
+          }
+
+          cells.forEach(function (cell) {
+            if (xRange) {
+              Plotly.relayout(cell, { "xaxis.range": xRange });
+            } else {
+              Plotly.relayout(cell, { "xaxis.autorange": true });
+            }
+          });
+        }
+
+        function setToggleState(view) {
+          currentView = view;
+          btn24h.setAttribute(
+            "aria-pressed",
+            view === "24h" ? "true" : "false",
+          );
+          btn96h.setAttribute(
+            "aria-pressed",
+            view === "96h" ? "true" : "false",
+          );
+          btn24h.classList.toggle("active", view === "24h");
+          btn96h.classList.toggle("active", view === "96h");
+          applyTimeRange();
+        }
+
+        btn24h.addEventListener("click", function () {
+          setToggleState("24h");
+        });
+        btn96h.addEventListener("click", function () {
+          setToggleState("96h");
+        });
 
         // --- Autocomplete state ---
         let debounceTimer = null;
-        let activeIndex = -1; // keyboard-highlighted suggestion index
+        let activeIndex = -1;
 
         function openSuggestions(items) {
           suggestions.innerHTML = "";
           activeIndex = -1;
-
-          items.forEach((city) => {
+          items.forEach(function (city) {
             const li = document.createElement("li");
             li.textContent = `${city.name}, ${city.country_code}`;
             li.dataset.value = city.ascii_name;
             li.setAttribute("role", "option");
             li.addEventListener("mousedown", function (e) {
-              // mousedown fires before blur; prevent input from losing focus
               e.preventDefault();
               selectSuggestion(city);
             });
             suggestions.appendChild(li);
           });
-
           if (items.length > 0) {
             suggestions.classList.add("open");
           } else {
@@ -120,7 +197,9 @@
 
         function setActiveItem(index) {
           const items = suggestions.querySelectorAll("li");
-          items.forEach((li) => li.classList.remove("active"));
+          items.forEach(function (li) {
+            li.classList.remove("active");
+          });
           if (index >= 0 && index < items.length) {
             items[index].classList.add("active");
             items[index].scrollIntoView({ block: "nearest" });
@@ -134,16 +213,13 @@
           form.requestSubmit();
         }
 
-        // Fetch suggestions from /api/cities?q=<query> with 300ms debounce
         input.addEventListener("input", function () {
           clearTimeout(debounceTimer);
           const query = input.value.trim();
-
           if (query.length < 2) {
             closeSuggestions();
             return;
           }
-
           debounceTimer = setTimeout(async function () {
             try {
               const resp = await fetch(
@@ -161,11 +237,9 @@
           }, 300);
         });
 
-        // Keyboard navigation: ↑ ↓ Enter Escape
         input.addEventListener("keydown", function (e) {
           const items = suggestions.querySelectorAll("li");
           if (!suggestions.classList.contains("open")) return;
-
           if (e.key === "ArrowDown") {
             e.preventDefault();
             setActiveItem(Math.min(activeIndex + 1, items.length - 1));
@@ -175,9 +249,7 @@
           } else if (e.key === "Enter") {
             if (activeIndex >= 0 && items[activeIndex]) {
               e.preventDefault();
-              const value = items[activeIndex].dataset.value;
-              const name = items[activeIndex].textContent;
-              input.value = value;
+              input.value = items[activeIndex].dataset.value;
               closeSuggestions();
               form.requestSubmit();
             }
@@ -186,16 +258,11 @@
           }
         });
 
-        // Close dropdown when focus leaves the input
         input.addEventListener("blur", function () {
           closeSuggestions();
         });
-
-        // Close dropdown on outside click (belt-and-suspenders with blur)
         document.addEventListener("click", function (e) {
-          if (!form.contains(e.target)) {
-            closeSuggestions();
-          }
+          if (!form.contains(e.target)) closeSuggestions();
         });
 
         // --- Chart loading ---
@@ -207,11 +274,20 @@
           if (!cityName) {
             statusMessage.innerHTML = "<p>Please enter a city name</p>";
             plotsGrid.innerHTML = "";
+            timeRangeToggle.style.display = "none";
             return;
           }
 
           statusMessage.innerHTML = "<p>Loading...</p>";
           plotsGrid.innerHTML = "";
+          timeRangeToggle.style.display = "none";
+
+          // Reset view state on each new search
+          currentView = "24h";
+          btn24h.classList.add("active");
+          btn96h.classList.remove("active");
+          btn24h.setAttribute("aria-pressed", "true");
+          btn96h.setAttribute("aria-pressed", "false");
 
           try {
             const response = await fetch(
@@ -221,11 +297,8 @@
 
             if (data.success) {
               statusMessage.innerHTML = "";
-
-              // Store timezone from API response
               const cityTimezone = data.timezone;
 
-              // Render one chart per pollen type
               for (const [pollenType, plotData] of Object.entries(data.plots)) {
                 const cell = document.createElement("div");
                 cell.className = "plot-cell";
@@ -237,7 +310,6 @@
                 );
                 plotsGrid.appendChild(cell);
 
-                // Add current time indicator if within forecast range
                 addCurrentTimeIndicator(plotData, cityTimezone);
 
                 Plotly.newPlot(
@@ -247,12 +319,9 @@
                   plotData.config,
                 );
 
-                // Click handler to open modal
                 cell.addEventListener("click", function () {
                   openModal(plotData, cityTimezone);
                 });
-
-                // Keyboard support (Enter/Space)
                 cell.addEventListener("keydown", function (e) {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
@@ -260,6 +329,10 @@
                   }
                 });
               }
+
+              // Show toggle and apply initial 24h range
+              timeRangeToggle.style.display = "block";
+              applyTimeRange();
 
               console.log(
                 `Loaded plots for ${data.city} (${data.lat}, ${data.lon}, ${cityTimezone})`,
@@ -275,65 +348,44 @@
           }
         });
 
-        // --- Helper function to add current time indicator ---
+        // --- Helper: current time indicator ---
         function addCurrentTimeIndicator(plotData, cityTimezone) {
           const now = new Date();
-
-          // Check if 'now' is within the forecast time range
-          // plotData.data is an array of traces; get x values from first trace
           if (
             !plotData.data ||
             plotData.data.length === 0 ||
             !plotData.data[0].x
-          ) {
-            return; // No data to check against
-          }
+          )
+            return;
 
           const xValues = plotData.data[0].x;
           const firstTime = new Date(xValues[0]);
           const lastTime = new Date(xValues[xValues.length - 1]);
 
-          // Only add indicator if current time is within forecast range
           if (now < firstTime || now > lastTime) {
-            console.log(`Current time is outside forecast range`);
+            console.log("Current time is outside forecast range");
             return;
           }
 
-          // Convert user's current time to city's timezone
-          // "sv-SE" locale gives YYYY-MM-DD HH:mm:ss format
           const cityLocalString = now.toLocaleString("sv-SE", {
             timeZone: cityTimezone,
           });
           const plotlyDatetime = cityLocalString.replace(" ", "T");
 
-          // Initialize shapes array if it doesn't exist
-          if (!plotData.layout.shapes) {
-            plotData.layout.shapes = [];
-          }
-
-          // Add vertical line at current time
+          if (!plotData.layout.shapes) plotData.layout.shapes = [];
           plotData.layout.shapes.push({
             type: "line",
             xref: "x",
-            yref: "paper", // spans full height of plot
+            yref: "paper",
             x0: plotlyDatetime,
             x1: plotlyDatetime,
             y0: 0,
             y1: 1,
-            line: {
-              color: "rgba(100, 100, 100, 0.6)",
-              width: 2,
-              dash: "dash",
-            },
+            line: { color: "rgba(100, 100, 100, 0.6)", width: 2, dash: "dash" },
             layer: "above",
           });
 
-          // Initialize annotations array if it doesn't exist
-          if (!plotData.layout.annotations) {
-            plotData.layout.annotations = [];
-          }
-
-          // Add "Now" label at the top of the line
+          if (!plotData.layout.annotations) plotData.layout.annotations = [];
           plotData.layout.annotations.push({
             x: plotlyDatetime,
             y: 1,
@@ -341,10 +393,7 @@
             yref: "paper",
             text: "Now",
             showarrow: false,
-            font: {
-              color: "rgba(100, 100, 100, 0.8)",
-              size: 12,
-            },
+            font: { color: "rgba(100, 100, 100, 0.8)", size: 12 },
             xanchor: "center",
             yanchor: "bottom",
           });
@@ -354,7 +403,7 @@
           );
         }
 
-        // --- Modal/Lightbox functionality ---
+        // --- Modal ---
         const modal = document.getElementById("plot-modal");
         const modalPlotContainer = document.getElementById(
           "modal-plot-container",
@@ -362,51 +411,34 @@
         const modalClose = modal.querySelector(".modal-close");
         const modalBackdrop = modal.querySelector(".modal-backdrop");
 
-        let currentModalPlotData = null;
-
         function openModal(plotData, cityTimezone) {
-          currentModalPlotData = plotData;
           modal.classList.add("open");
           modal.setAttribute("aria-hidden", "false");
-          document.body.style.overflow = "hidden"; // prevent background scroll
+          document.body.style.overflow = "hidden";
 
-          // Add current time indicator if within forecast range
           addCurrentTimeIndicator(plotData, cityTimezone);
 
-          // Re-render plot at larger size
           Plotly.newPlot(modalPlotContainer, plotData.data, plotData.layout, {
             ...plotData.config,
             responsive: true,
           });
 
-          // Focus close button for accessibility
           modalClose.focus();
         }
 
         function closeModal() {
           modal.classList.remove("open");
           modal.setAttribute("aria-hidden", "true");
-          document.body.style.overflow = ""; // restore scroll
-
-          // Clear the plot to free memory
+          document.body.style.overflow = "";
           Plotly.purge(modalPlotContainer);
-          currentModalPlotData = null;
         }
 
-        // Close button click
         modalClose.addEventListener("click", closeModal);
-
-        // Backdrop click
         modalBackdrop.addEventListener("click", closeModal);
-
-        // Escape key
         document.addEventListener("keydown", function (e) {
-          if (e.key === "Escape" && modal.classList.contains("open")) {
+          if (e.key === "Escape" && modal.classList.contains("open"))
             closeModal();
-          }
         });
-
-        // Prevent modal content clicks from closing modal
         modal
           .querySelector(".modal-content")
           .addEventListener("click", function (e) {
