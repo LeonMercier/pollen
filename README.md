@@ -1,23 +1,24 @@
 # Pollen ETL project
 
-This is a work in progress ETL pipeline for visualizing pollen forecast data from [the EU Copernicus programme](https://atmosphere.copernicus.eu/). The pipeline is deployed on Azure and you can see outputs live [here](https://stwebpollenprod.z1.web.core.windows.net/), with updates once per day!!
+This is a work in progress ETL pipeline for visualizing pollen forecast data from [the EU Copernicus programme](https://atmosphere.copernicus.eu/). The pipeline is deployed on Azure and you can see outputs live [here](http://www.pollencast.eu/), with updates once per day!!
 
 Check out the project description and goals [here](showcase.pdf).
 
 ## Tech used
 
 - Orchestration: Azure Data Factory
-- Compute: pySpark on Databricks
+- ETL pipeline: pySpark on Databricks
 - Database: Azure PostgreSQL Flexible Server
+- Backend: FastAPI on Azure App Service
 - Visualizations: plotly
-- API: FastAPI (under development)
+- Frontend: hosted on Azure blob storage
 - Infrastructure as Code: Terraform
 
 ## Setting up the dev environment
 
 Clone this repo and then do the following:
 
-Create local python environment. The code cannot run locally, but at least you can get hints in your IDE.
+Create local python environment. The notebook code cannot run locally, but at least you can get hints in your IDE.
 
 ```
 python3.12 -m venv .venv
